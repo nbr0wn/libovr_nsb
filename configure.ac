@@ -1,11 +1,11 @@
 #name='libovr_nsb'
-#version='0.1.0'
+#version='0.2.0'
 #library_interface_version='0:0:0'
-#email='nbrown@ixionstudios.com'
+#email='nbrown1@gmail.com'
 
-m4_define([OVR_VERSION_STRING], [0.1.0])
+m4_define([OVR_VERSION_STRING], [0.2.0])
 m4_define([OVR_NAME], [libovr_nsb])
-m4_define([OVR_EMAIL], [nbrown@ixionstudios.com])
+m4_define([OVR_EMAIL], [nbrown1@gmail.com])
 
 AC_PREREQ([2.13])
 AC_INIT([OVR_NAME], [OVR_VERSION_STRING], [OVR_EMAIL])
