@@ -16,6 +16,8 @@
 void *threadRun( void *data )
 {
     Device *dev = (Device *)data;
+<<<<<<< HEAD
+=======
     fd_set readset;
     struct timeval waitTime;
 
@@ -25,11 +27,15 @@ void *threadRun( void *data )
 
     FD_ZERO(&readset);
     FD_SET(dev->fd,&readset);
+>>>>>>> 407ee91efdfafab106757040c9bfa0a25fe2ecd3
 
     sendSensorKeepAlive(dev);
 
     while( dev->runSampleThread )
     {
+<<<<<<< HEAD
+        waitSampleDevice(dev,500);
+=======
         waitTime.tv_sec = 0;
         waitTime.tv_usec = 500000;
         int result = select(dev->fd + 1, &readset, NULL, NULL, &waitTime );
@@ -38,6 +44,7 @@ void *threadRun( void *data )
         {
             sampleDevice(dev);
         }
+>>>>>>> 407ee91efdfafab106757040c9bfa0a25fe2ecd3
         // Send a keepalive - this is too often.  Need to only send on keepalive interval
         sendSensorKeepAlive(dev);
     }
@@ -60,10 +67,18 @@ int main( int argc, char ** argv )
     }
 
     printf("Device Info:\n");
+<<<<<<< HEAD
+    printf("\tmanufacturer: %ls\n", dev->manufacturer);
+    printf("\tproduct:      %ls\n", dev->product);
+    printf("\tserial:       %ls\n", dev->serial);
+    printf("\tvendor:       0x%04hx\n", dev->vendorId);
+    printf("\tproduct:      0x%04hx\n", dev->productId);
+=======
     printf("\tname:     %s\n", dev->name);
     printf("\tlocation: %s\n", dev->location);
     printf("\tvendor:   0x%04hx\n", dev->vendorId);
     printf("\tproduct:  0x%04hx\n", dev->productId);
+>>>>>>> 407ee91efdfafab106757040c9bfa0a25fe2ecd3
 
     printf("CTRL-C to quit\n\n");
 

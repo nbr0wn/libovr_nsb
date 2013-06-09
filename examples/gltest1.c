@@ -291,29 +291,11 @@ void displayFunc( )
 void *threadFunc( void *data )
 {
     Device *dev = (Device *)data;
-    fd_set readset;
-    struct timeval waitTime;
-
-    // 500ms
-    waitTime.tv_sec = 0;
-    waitTime.tv_usec = 500000;
-
-    FD_ZERO(&readset);
-    FD_SET(dev->fd,&readset);
-
     while( dev->runSampleThread )
     {
-        waitTime.tv_sec = 0;
-        waitTime.tv_usec = 500000;
-        int result = select(dev->fd + 1, &readset, NULL, NULL, &waitTime );
-
-        if ( result && FD_ISSET( dev->fd, &readset ) )
-        {
-            sampleDevice(dev);
-        }
+        waitSampleDevice(dev,500);
         // Send a keepalive - this is too often.  Need to only send on keepalive interval
         sendSensorKeepAlive(dev);
-        //printf("Keepalive\n");
     }
     return 0;
 }
@@ -345,10 +327,11 @@ int main( int argc, char ** argv )
     }
 
     printf("Device Info:\n");
-    printf("\tname:     %s\n", dev->name);
-    printf("\tlocation: %s\n", dev->location);
-    printf("\tvendor:   0x%04hx\n", dev->vendorId);
-    printf("\tproduct:  0x%04hx\n", dev->productId);
+    printf("\tmanufacturer: %ls\n", dev->manufacturer);
+    printf("\tproduct:      %ls\n", dev->product);
+    printf("\tserial:       %ls\n", dev->serial);
+    printf("\tvendor:       0x%04hx\n", dev->vendorId);
+    printf("\tproduct:      0x%04hx\n", dev->productId);
 
     printf("\n\nf - toggle wireframe\n");
     printf("ESC or q to quit\n\n");
