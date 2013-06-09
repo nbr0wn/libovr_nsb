@@ -1,0 +1,47 @@
+#name='libovr_nsb'
+#version='0.1.0'
+#library_interface_version='0:0:0'
+#email='nbrown@ixionstudios.com'
+
+m4_define([OVR_VERSION_STRING], [0.1.0])
+m4_define([OVR_NAME], [libovr_nsb])
+m4_define([OVR_EMAIL], [nbrown@ixionstudios.com])
+
+AC_PREREQ([2.13])
+AC_INIT([OVR_NAME], [OVR_VERSION_STRING], [OVR_EMAIL])
+AM_INIT_AUTOMAKE([1.10 no-define foreign -Wall -Werror])
+AM_PROG_AR
+LT_INIT
+AC_CANONICAL_HOST
+
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+
+hidapi="hidapi"
+
+AC_SUBST(PKG_CONFIG_EXTRA_PATH, "")
+AC_SUBST(EXTRA_LD_FLAGS, "")
+
+AC_MSG_CHECKING([operating system])
+case "$host" in
+*-linux*)
+	AC_MSG_RESULT([$host (Linux)])
+	hidapi="hidapi-libusb"
+
+	#link with realtime lib on linux for clock_gettime
+	AC_SUBST(EXTRA_LD_FLAGS, "-lrt")
+	;;
+*-freebsd*)
+	AC_SUBST(PKG_CONFIG_EXTRA_PATH, "libdata/")
+	;;
+esac
+
+PKG_CHECK_MODULES([hidapi], [$hidapi] >= 0.0.5)
+
+AC_PROG_CC
+AC_PROG_CC_C99
+
+AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_HEADERS([config.h])
+
+AC_OUTPUT([Makefile libovr_nsb/lib/Makefile libovr_nsb/gl-matrix.c/Makefile examples/Makefile])
+AC_OUTPUT 
