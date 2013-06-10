@@ -13,8 +13,7 @@ realclean:
 		ar-lib \
 		autom4te.cache \
 		config.guess \
-		config.h \
-		config.h.in \
+		config.h* \
 		config.log \
 		config.status \
 		config.sub \

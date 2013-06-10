@@ -6,6 +6,9 @@ the excellent hidapi library for the HID heavy lifting.  I had originally create
 some HID routines myself, but hidapi offers cross-platform support so I decided 
 to switch in the eventual hopes that I'd support other platforms in the future.
 
+This library was created to provide access to the drivers and sensor fusion algorithms written by 
+Oculus VR from basic C functions.
+
 Prerequesites
 --------------
 + GLUT (for the examples)
@@ -41,7 +44,16 @@ Excellent idea Shamelessly copied from the [OpenHMD](https://github.com/OpenHMD/
 
 Installing
 ----------
-Not yet installable
+
+    make install
+
+This will install into $PREFIX.  You'll need to export LD_LIBRARY_PATH to point at $PREFIX/lib in order to run the examples
+
+Uninstall
+----------
+
+    make uninstall
+
 
 License
 -------
