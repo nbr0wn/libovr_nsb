@@ -14,7 +14,7 @@ AM_PROG_AR
 LT_INIT
 AC_CANONICAL_HOST
 
-m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+#m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 hidapi="hidapi"
 
@@ -38,7 +38,7 @@ esac
 PKG_CHECK_MODULES([hidapi], [$hidapi] >= 0.0.5)
 
 AC_PROG_CC
-AC_PROG_CC_C99
+#AC_PROG_CC_C99
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config.h])

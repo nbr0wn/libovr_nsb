@@ -1,3 +1,5 @@
+#include <GL/gl.h>
+#include <GL/glext.h>
 #include <GL/freeglut.h>
 #include <stdlib.h>
 #include <math.h>
@@ -1173,11 +1175,10 @@ int main( int argc, char ** argv )
         printf("<Warning: Continuing without HMD, using defaults.>\n");
     }else{
         printf("Device Info:\n");
-        printf("\tmanufacturer: %ls\n", dev->manufacturer);
-        printf("\tproduct:      %ls\n", dev->product);
-        printf("\tserial:       %ls\n", dev->serial);
-        printf("\tvendor:       0x%04hx\n", dev->vendorId);
-        printf("\tproduct:      0x%04hx\n", dev->productId);
+        printf("\tname:     %s\n", dev->name);
+        printf("\tlocation: %s\n", dev->location);
+        printf("\tvendor:   0x%04hx\n", dev->vendorId);
+        printf("\tproduct:  0x%04hx\n", dev->productId);
 
         // Fire up Sensor update thread
         runSensorUpdateThread(dev);
