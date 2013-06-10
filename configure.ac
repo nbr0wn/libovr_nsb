@@ -35,7 +35,11 @@ case "$host" in
 	;;
 esac
 
+# Check for HIDAPI
 PKG_CHECK_MODULES([hidapi], [$hidapi] >= 0.0.5)
+
+# Check for freeglut
+AC_CHECK_LIB([glut])
 
 AC_PROG_CC
 #AC_PROG_CC_C99
