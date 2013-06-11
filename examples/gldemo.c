@@ -1062,26 +1062,13 @@ void displayFunc( )
 void *threadFunc( void *data )
 {
     Device *dev = (Device *)data;
-    fd_set readset;
-    struct timeval waitTime;
-
-    // 500ms
-    waitTime.tv_sec = 0;
-    waitTime.tv_usec = 500000;
-
-    FD_ZERO(&readset);
-    FD_SET(dev->fd,&readset);
 
     while( dev->runSampleThread )
     {
-        waitTime.tv_sec = 0;
-        waitTime.tv_usec = 500000;
-        int result = select(dev->fd + 1, &readset, NULL, NULL, &waitTime );
+        char buf[256];
+		int read = hid_read_timeout(dev->hidapi_dev, buf, 256, 1000 );
+        processSample(dev,buf,read);
 
-        if ( result && FD_ISSET( dev->fd, &readset ) )
-        {
-            sampleDevice(dev);
-        }
         // Send a keepalive - this is too often.  Need to only send on keepalive interval
         sendSensorKeepAlive(dev);
         //printf("Keepalive\n");

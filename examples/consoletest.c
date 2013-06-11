@@ -34,28 +34,14 @@ int main( int argc, char ** argv )
 
     sendSensorKeepAlive(dev);
 
-    fd_set readset;
-    struct timeval waitTime;
-
-    // 500ms
-    waitTime.tv_sec = 0;
-    waitTime.tv_usec = 500000;
-
-    FD_ZERO(&readset);
-    FD_SET(dev->fd,&readset);
-
     for(;;)
     {
-        waitTime.tv_sec = 0;
-        waitTime.tv_usec = 500000;
+        char buf[256];
+		int read = hid_read_timeout(dev->hidapi_dev, buf, 256, 1000 );
 
-        // Wait for the device to have some data available
-        int result = select(dev->fd + 1, &readset, NULL, NULL, &waitTime );
+        // Process what we read
+        processSample(dev,buf,read);
 
-        if ( result && FD_ISSET( dev->fd, &readset ) )
-        {
-            sampleDevice(dev);
-        }
         // Send a keepalive - this is too often.  Need to only send on keepalive interval
         sendSensorKeepAlive(dev);
 
