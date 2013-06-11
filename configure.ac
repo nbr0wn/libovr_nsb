@@ -1,8 +1,3 @@
-#name='libovr_nsb'
-#version='0.2.0'
-#library_interface_version='0:0:0'
-#email='nbrown1@gmail.com'
-
 m4_define([OVR_VERSION_STRING], [0.2.0])
 m4_define([OVR_NAME], [libovr_nsb])
 m4_define([OVR_EMAIL], [nbrown1@gmail.com])
@@ -14,29 +9,15 @@ AM_PROG_AR
 LT_INIT
 AC_CANONICAL_HOST
 
-#m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
-
-hidapi="hidapi"
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_SUBST(PKG_CONFIG_EXTRA_PATH, "")
 AC_SUBST(EXTRA_LD_FLAGS, "")
 
 AC_MSG_CHECKING([operating system])
-case "$host" in
-*-linux*)
-	AC_MSG_RESULT([$host (Linux)])
-	hidapi="hidapi-libusb"
-
-	#link with realtime lib on linux for clock_gettime
-	AC_SUBST(EXTRA_LD_FLAGS, "-lrt")
-	;;
-*-freebsd*)
-	AC_SUBST(PKG_CONFIG_EXTRA_PATH, "libdata/")
-	;;
-esac
 
 # Check for HIDAPI
-PKG_CHECK_MODULES([hidapi], [$hidapi] >= 0.0.5)
+PKG_CHECK_MODULES([hidapi], [hidapi-libusb] >= 0.0.5)
 
 # Check for freeglut
 AC_CHECK_LIB([glut])
