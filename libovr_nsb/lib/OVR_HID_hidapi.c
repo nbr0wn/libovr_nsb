@@ -6,6 +6,9 @@
 #include <dirent.h>
 
 #include "OVR_HID.h"
+
+#define MAX_STR 255
+
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Scan /dev looking for hidraw devices and then check to see if each is a Rift
 // nthDevice is 0-based
@@ -13,7 +16,6 @@
 Device * openRiftHID( int nthDevice, Device *myDev )
 {
 	struct hid_device_info *devs, *cur_dev;
-	#define MAX_STR 255
 	wchar_t wstr[MAX_STR];
     Device *dev = myDev;
 	
@@ -28,18 +30,30 @@ Device * openRiftHID( int nthDevice, Device *myDev )
             }
             dev->hidapi_dev = (hid_device *)hid_open(cur_dev->vendor_id, cur_dev->product_id, cur_dev->serial_number);
 
+            dev->vendorId = cur_dev->vendor_id;
+            dev->productId = cur_dev->product_id;
+
+            printf("\n\nDevice Found:\n");
+
             // Read the Manufacturer String
             hid_get_manufacturer_string(dev->hidapi_dev, wstr, MAX_STR);
-            printf("Manufacturer String: %ls\n", wstr);
+            printf("Manufacturer:  %ls\n", wstr);
+            dev->name = malloc(sizeof(wchar_t) * wcslen(wstr) + 1);
+            wcstombs(dev->name, wstr, wcslen(wstr));
 
             // Read the Product String
             hid_get_product_string(dev->hidapi_dev, wstr, MAX_STR);
-            printf("Product String: %ls\n", wstr);
+            printf("Product:       %ls\n", wstr);
+            dev->location = malloc(sizeof(wchar_t) * wcslen(wstr) + 1);
+            wcstombs(dev->location, wstr, wcslen(wstr));
 
             // Read the Serial Number String
             hid_get_serial_number_string(dev->hidapi_dev, wstr, MAX_STR);
-            printf("Serial Number String: %ls", wstr);
-            printf("\n");
+            printf("Serial Number: %ls", wstr);
+            dev->serial = malloc(sizeof(wchar_t) * wcslen(wstr) + 1);
+            wcstombs(dev->serial, wstr, wcslen(wstr));
+
+            printf("\n\n");
             break;
         }
         nthDevice--;
