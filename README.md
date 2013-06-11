@@ -1,13 +1,11 @@
 libovr_nsb v0.2.0
 =================
 
-This is a Pure C library implementation of the [Oculus Rift](http://oculusvr.com) SDK.  The library uses 
-the excellent hidapi library for the HID heavy lifting.  I had originally created 
-some HID routines myself, but hidapi offers cross-platform support so I decided 
-to switch in the eventual hopes that I'd support other platforms in the future.
+This is a Pure C implementation of the [Oculus Rift](http://oculusvr.com) SDK in static and shared library form.  This library was created to provide access to the drivers and sensor fusion algorithms produced by Oculus VR from basic C functions.
 
-This library was created to provide access to the drivers and sensor fusion algorithms written by 
-Oculus VR from basic C functions.
+The library uses the excellent hidapi library for the HID heavy lifting.  I had originally created some HID routines myself, but hidapi offers cross-platform support so I decided to switch in the eventual hopes that I'd support other platforms in the future.
+
+This library also uses [gl-matrix.c](https://github.com/Coreh/gl-matrix.c), which is a permissively-licensed vector/matrix/quat library. This choice was pretty arbitrary.  I didn't want to write one myself and I wanted one with a license that was compatible with the Oculus VR SDK.  Only a handful of functions are actually used for the tracker updates, but having a whole library available is handy.
 
 Prerequesites
 --------------
@@ -74,16 +72,12 @@ Other HMD Libraries
 ### LibVR ###
  + [http://hg.sitedethib.com/libvr](http://hg.sitedethib.com/libvr)
 
-
-Extras
--------
-This library uses gl-matrix.c, which is a vector/matrix/quat library from 
-[https://github.com/Coreh/gl-matrix.c](https://github.com/Coreh/gl-matrix.c). This choice was pretty arbitrary.
-I didn't want to write one myself and I wanted one with a permissive 
-license.  Only a handful of functions are actually used for the tracker 
-updates, but having a whole library available is handy, so here it is.
-
 Contact
 --------
 If you're on the oculus rift forums ( https://developer.oculusvr.com/forums/ )
 you can pm to 'nsb' there.  Otherwise, feel free to email me: nbrown1@gmail.com
+
+Contributors
+------------
+To Be Announced if they want to be called out
+

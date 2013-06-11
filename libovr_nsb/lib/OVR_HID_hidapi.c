@@ -15,6 +15,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////
 Device * openRiftHID( int nthDevice, Device *myDev )
 {
+    BOOLEAN didAlloc = FALSE;
 	struct hid_device_info *devs, *cur_dev;
 	wchar_t wstr[MAX_STR];
     Device *dev = myDev;
@@ -27,8 +28,12 @@ Device * openRiftHID( int nthDevice, Device *myDev )
             if (! dev )
             {
                 dev = (Device *)malloc(sizeof(Device));
+                didAlloc = TRUE;
             }
-            dev->hidapi_dev = (hid_device *)hid_open(cur_dev->vendor_id, cur_dev->product_id, cur_dev->serial_number);
+
+            // Open the device
+            dev->hidapi_dev = (hid_device *)hid_open(cur_dev->vendor_id, 
+                    cur_dev->product_id, cur_dev->serial_number);
 
             dev->vendorId = cur_dev->vendor_id;
             dev->productId = cur_dev->product_id;
@@ -65,10 +70,25 @@ Device * openRiftHID( int nthDevice, Device *myDev )
     {
         // Make our device nonblocking
         hid_set_nonblocking(dev->hidapi_dev, 1);
+
+        // Init the Rift sensor info
+        if( ! getSensorInfo( dev ) )
+        {
+            // Clean up
+            if( didAlloc )
+            {
+                free(dev);
+            }
+            dev = 0;
+        }
     }
     else
     {
-        free(dev);
+        // Clean up
+        if ( didAlloc )
+        {
+            free(dev);
+        }
         dev = 0;
     }
 
