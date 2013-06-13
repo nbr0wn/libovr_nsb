@@ -69,7 +69,7 @@ void printMatrix( float *m ){
 void showUniforms( GLuint prog ){
    int total = -1;
    glGetProgramiv( prog, GL_ACTIVE_UNIFORMS, &total ); 
-   printf( "Uniforms for program %d:\n" );
+   //printf( "Uniforms for program %d:\n" );
    int i;
    char name[128];
    for( i=0; i<total; i++ ){
@@ -1061,17 +1061,30 @@ void displayFunc( )
 /////////////////////////////////////////////////////////////////////////////////////
 void *threadFunc( void *data )
 {
-    Device *dev = (Device *)data;
+    Device *localDev = (Device *)data;
+    if( !openRift(0,localDev) )
+    {
+        printf("Could not locate Rift\n");
+        printf("Be sure you have read/write permission to the proper /dev/hidrawX device\n");
+        return 0;
+    }
 
-    while( dev->runSampleThread )
+    printf("Device Info:\n");
+    printf("\tName:      %s\n", localDev->name);
+    printf("\tNroduct:   %s\n", localDev->product);
+    printf("\tVendorID:  0x%04hx\n", localDev->vendorId);
+    printf("\tProductID: 0x%04hx\n", localDev->productId);
+
+    printf("ESC or q to quit\n\n");
+
+    while( localDev->runSampleThread )
     {
         char buf[256];
-		int read = hid_read_timeout(dev->hidapi_dev, buf, 256, 1000 );
-        processSample(dev,buf,read);
+		int read = hid_read_timeout(localDev->hidapi_dev, buf, 256, 1000 );
+        processSample(localDev,buf,read);
 
         // Send a keepalive - this is too often.  Need to only send on keepalive interval
-        sendSensorKeepAlive(dev);
-        //printf("Keepalive\n");
+        sendSensorKeepAlive(localDev);
     }
     return 0;
 }
@@ -1153,26 +1166,8 @@ void fn2( double x, double y, double z, unsigned char *d ){
 //-----------------------------------------------------------------------------
 int main( int argc, char ** argv )
 {
-    dev = openRift(0,0);
-
-    if( !dev )
-    {
-        printf("Could not locate Rift\n");
-        printf("Be sure you have read/write permission to the proper /dev/hidrawX device\n");
-        printf("<Warning: Continuing without HMD, using defaults.>\n");
-    }else{
-        printf("Device Info:\n");
-        printf("\tname:     %s\n", dev->name);
-        printf("\tlocation: %s\n", dev->location);
-        printf("\tvendor:   0x%04hx\n", dev->vendorId);
-        printf("\tproduct:  0x%04hx\n", dev->productId);
-
-        // Fire up Sensor update thread
-        runSensorUpdateThread(dev);
-    }
-
-    printf("ESC or q to quit\n\n");
-
+    dev = (Device *)malloc(sizeof(Device));
+    runSensorUpdateThread(dev);
 
     glutInitContextVersion( 4, 2 );
     glutInitContextFlags( GLUT_CORE_PROFILE | GLUT_DEBUG );
@@ -1204,7 +1199,7 @@ int main( int argc, char ** argv )
     //  use of uniform variables is consistent
     GLuint shader = shaderProgram( COUNTED_ARRAY(shdrNoLight) );
 
-    //showUniforms( shader );
+    showUniforms( shader );
 
     // New vertex format
     VDesc desc[] =
@@ -1287,6 +1282,7 @@ int main( int argc, char ** argv )
     distortionUpdateOffsetAndScale( &g_defaultDistort, displayInfo, &framebuffer, x, y );
 
     projectionMatrix( g_framebuffer, displayInfo, &g_defaultDistort, stereo, g_proj );
+
 
     // Go Glut
     glutMainLoop();

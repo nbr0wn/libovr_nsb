@@ -49,8 +49,8 @@ Device * openRiftHID( int nthDevice, Device *myDev )
             // Read the Product String
             hid_get_product_string(dev->hidapi_dev, wstr, MAX_STR);
             printf("Product:       %ls\n", wstr);
-            dev->location = malloc(sizeof(wchar_t) * wcslen(wstr) + 1);
-            wcstombs(dev->location, wstr, wcslen(wstr));
+            dev->product = malloc(sizeof(wchar_t) * wcslen(wstr) + 1);
+            wcstombs(dev->product, wstr, wcslen(wstr));
 
             // Read the Serial Number String
             hid_get_serial_number_string(dev->hidapi_dev, wstr, MAX_STR);

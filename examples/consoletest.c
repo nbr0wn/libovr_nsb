@@ -25,10 +25,10 @@ int main( int argc, char ** argv )
     }
 
     printf("Device Info:\n");
-    printf("\tname:     %s\n", dev->name);
-    printf("\tlocation: %s\n", dev->location);
-    printf("\tvendor:   0x%04hx\n", dev->vendorId);
-    printf("\tproduct:  0x%04hx\n", dev->productId);
+    printf("\tName:      %s\n", dev->name);
+    printf("\tProduct:   %s\n", dev->product);
+    printf("\tVendorID:  0x%04hx\n", dev->vendorId);
+    printf("\tProductID: 0x%04hx\n", dev->productId);
 
     printf("CTRL-C to quit\n\n");
 

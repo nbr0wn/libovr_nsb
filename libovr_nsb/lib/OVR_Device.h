@@ -77,7 +77,7 @@ typedef struct
     BOOLEAN           runSampleThread;
     UInt16            keepAliveIntervalMs;
     char              *name;
-    char              *location;
+    char              *product;
     char              *serial;
     UInt16            vendorId;
     UInt16            productId;
