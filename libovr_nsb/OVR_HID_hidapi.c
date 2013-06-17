@@ -5,6 +5,7 @@
 #include <math.h>
 #include <dirent.h>
 
+#include <libovr_nsb/OVR_HID.h>
 #include <libovr_nsb/OVR_Sensor.h>
 
 #define MAX_STR 255
