@@ -9,10 +9,10 @@ This library also uses [gl-matrix.c](https://github.com/Coreh/gl-matrix.c), whic
 
 PRE-BUILT BINARY PACKAGES
 -------------------------
-For now, I only have the following packages:
-+[Ubuntu 13.04 64bit deb](http://juggerhost.com/ubuntu_13/libovrnsb_0.3.0_amd64.deb)
-+[Ubuntu 13.04 32bit deb](http://juggerhost.com/ubuntu_13/libovrnsb_0.3.0_i686.deb)
-+[Ubuntu 12.04LTS 64bit deb](http://juggerhost.com/ubuntu_12/libovrnsb_0.3.0_amd64.deb)
+For now, I only have the following packages.  You will still need to install HIDAPI (see prerequesites) to use the library.
++ [Ubuntu 13.04 64bit deb](http://juggerhost.com/ubuntu_13/libovrnsb_0.3.0_amd64.deb)
++ [Ubuntu 13.04 32bit deb](http://juggerhost.com/ubuntu_13/libovrnsb_0.3.0_i686.deb)
++ [Ubuntu 12.04LTS 64bit deb](http://juggerhost.com/ubuntu_12/libovrnsb_0.3.0_amd64.deb)
 
 Prerequesites
 --------------
@@ -22,14 +22,14 @@ Prerequesites
 
 
 From a base ubuntu install, grab the following packages: 
-+g++ 
-+gcc 
-+make 
-+automake 
-+libtool 
-+freeglut3-dev 
-+libudev-dev 
-+libusb-1.0-0-dev
++ g++ 
++ gcc 
++ make 
++ automake 
++ libtool 
++ freeglut3-dev 
++ libudev-dev 
++ libusb-1.0-0-dev
 
 Compiling
 ---------
