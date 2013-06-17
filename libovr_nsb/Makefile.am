@@ -1,4 +1,4 @@
-library_includedir=$(top_builddir)/gl-matrix
+library_includedir=$(top_builddir)/gl_matrix
 libnsbdir = $(includedir)/libovr_nsb
 libnsb_HEADERS = \
 				 OVR_Defs.h \

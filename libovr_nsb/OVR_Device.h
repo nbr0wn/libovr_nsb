@@ -8,7 +8,7 @@
 #include <math.h>
 
 #include <hidapi/hidapi.h>
-#include <gl-matrix/gl-matrix.h>
+#include <gl_matrix/gl_matrix.h>
 
 #include <libovr_nsb/OVR_Defs.h>
 

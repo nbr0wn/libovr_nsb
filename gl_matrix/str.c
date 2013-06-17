@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "gl-matrix.h"
+#include "gl_matrix.h"
 
 void vec3_str(vec3_t vec, char *buffer) {
     sprintf(buffer, "[%f, %f, %f]", vec[0], vec[1], vec[2]);

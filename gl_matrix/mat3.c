@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "gl-matrix.h"
+#include "gl_matrix.h"
 
 mat3_t mat3_create(mat3_t mat) {
     mat3_t dest = calloc(sizeof(double), 9);

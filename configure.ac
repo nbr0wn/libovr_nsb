@@ -28,5 +28,5 @@ AC_PROG_CC
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config.h])
 
-AC_OUTPUT([Makefile libovr_nsb/Makefile gl-matrix/Makefile examples/Makefile])
+AC_OUTPUT([Makefile libovr_nsb/Makefile gl_matrix/Makefile examples/Makefile])
 AC_OUTPUT 

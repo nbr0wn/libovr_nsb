@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <math.h>
 
-#include <gl-matrix/gl-matrix.h>
+#include <gl_matrix/gl_matrix.h>
 
 #include <libovr_nsb/OVR_Defs.h>
 #include <libovr_nsb/OVR_Device.h>

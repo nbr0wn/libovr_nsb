@@ -1,0 +1,8 @@
+Package: libovrnsb 
+Version: 0.3.0 
+Section: base 
+Priority: optional 
+Architecture: amd64
+Depends: bash 
+Maintainer: nbrown1@gmail.com
+Description: C port of Oculus Rift driver by Oculus VR

@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "gl-matrix.h"
+#include "gl_matrix.h"
 
 quat_t quat_create(quat_t quat) {
     quat_t dest = calloc(sizeof(double), 4);

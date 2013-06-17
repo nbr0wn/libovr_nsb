@@ -2,7 +2,7 @@
 #define __USE_GNU
 #include <math.h>
 
-#include "gl-matrix.h"
+#include "gl_matrix.h"
 
 mat4_t mat4_create(mat4_t mat) {
     mat4_t dest = calloc(sizeof(double), 16);

@@ -32,7 +32,9 @@ realclean:
 		libovr_nsb/lib/Makefile.in \
 		libovr_nsb/lib/Makefile \
 		libovr_nsb/lib/.deps \
-		libovr_nsb/gl-matrix.c/Makefile.in \
-		libovr_nsb/gl-matrix.c/Makefile \
-		libovr_nsb/gl-matrix.c/.deps 
+		libovr_nsb/lib/.libs \
+		gl_matrix/Makefile.in \
+		gl_matrix/Makefile \
+		gl_matrix/.deps \
+		gl_matrix/.libs 
 	@cp -f Makefile.clean Makefile

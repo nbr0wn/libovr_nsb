@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "gl-matrix.h"
+#include "gl_matrix.h"
 
 vec3_t vec3_create(vec3_t vec) {
     vec3_t dest = calloc(sizeof(double_t), 3);
