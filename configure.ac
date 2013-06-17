@@ -1,4 +1,4 @@
-m4_define([OVR_VERSION_STRING], [0.2.0])
+m4_define([OVR_VERSION_STRING], [0.3.0])
 m4_define([OVR_NAME], [libovr_nsb])
 m4_define([OVR_EMAIL], [nbrown1@gmail.com])
 

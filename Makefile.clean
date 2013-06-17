@@ -48,5 +48,6 @@ realclean:
 		gl_matrix/Makefile.in \
 		gl_matrix/Makefile \
 		gl_matrix/.deps \
-		gl_matrix/.libs 
+		gl_matrix/.libs \
+		packages/libovr*
 	@cp -f Makefile.clean Makefile

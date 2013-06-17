@@ -17,7 +17,7 @@ cp ../gl_matrix/.libs/*.so libovrnsb/usr/lib
 
 # Copy over includes
 cp ../libovr_nsb/*.h libovrnsb/usr/include/libovr_nsb
-cp ../gl_matrix/gl-matrix.h libovrnsb/usr/include/gl_matrix
+cp ../gl_matrix/gl_matrix.h libovrnsb/usr/include/gl_matrix
 
 
 # Build the package file
