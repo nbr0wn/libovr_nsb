@@ -26,9 +26,9 @@
 #define OVR_VENDOR 0x2833
 #define OVR_PRODUCT 0x0001
 
+// Low level HID functions - use methods in OVR_Sensor.h
 BOOLEAN sendSensorScaleRange( Device *dev, const struct SensorScaleRange *r);
 BOOLEAN sendSensorConfig(Device *dev, UInt8 flags, UInt8 packetInterval, UInt16 keepAliveIntervalMs);
-BOOLEAN sendSensorKeepAlive(Device *dev);
 BOOLEAN getSensorInfo( Device *dev );
 Device * openRiftHID( int nthDevice, Device *myDev );
 void closeRiftHID( Device *dev);

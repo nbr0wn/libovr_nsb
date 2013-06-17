@@ -7,7 +7,7 @@
 #include <pthread.h>
 #include <sys/epoll.h>
 
-#include "OVR.h"
+#include <libovr_nsb/OVR.h>
 
 //-----------------------------------------------------------------------------
 // Name: main( )
@@ -36,11 +36,8 @@ int main( int argc, char ** argv )
 
     for(;;)
     {
-        char buf[256];
-		int read = hid_read_timeout(dev->hidapi_dev, buf, 256, 1000 );
-
-        // Process what we read
-        processSample(dev,buf,read);
+        // Try to sample the device for 1ms
+        waitSampleDevice(dev, 1000);
 
         // Send a keepalive - this is too often.  Need to only send on keepalive interval
         sendSensorKeepAlive(dev);

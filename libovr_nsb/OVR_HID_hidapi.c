@@ -5,7 +5,7 @@
 #include <math.h>
 #include <dirent.h>
 
-#include "OVR_HID.h"
+#include <libovr_nsb/OVR_Sensor.h>
 
 #define MAX_STR 255
 
@@ -184,7 +184,6 @@ BOOLEAN getSensorInfo( Device *dev )
     } 
     else 
     {
-        int i;
         dev->sensorInfo.DistortionType          = Buffer[3];
         dev->sensorInfo.HResolution             = DecodeUInt16(Buffer+4);
         dev->sensorInfo.VResolution             = DecodeUInt16(Buffer+6);
@@ -202,6 +201,8 @@ BOOLEAN getSensorInfo( Device *dev )
         dev->sensorInfo.DistortionK[5]          = DecodeFloat(Buffer+52);
 
 #if 0
+        {
+        int i;
         printf ("\nSensor Info:\n");
 		for (i = 0; i < res; i++)
 			printf("%hhx ", Buffer[i]);
@@ -209,6 +210,7 @@ BOOLEAN getSensorInfo( Device *dev )
 
         printf ("\nR: %d x %d", dev->sensorInfo.HResolution, dev->sensorInfo.VResolution );
         printf ("\tS: %f x %f\n", dev->sensorInfo.HScreenSize, dev->sensorInfo.VScreenSize );
+        }
 #endif
     }
     return TRUE;

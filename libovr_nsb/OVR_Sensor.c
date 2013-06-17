@@ -8,8 +8,8 @@
 #include <pthread.h>
 #include <sys/epoll.h>
 
-#include <ovr_nsb/OVR_Sensor.h>
-#include <ovr_nsb/OVR_HID.h>
+#include <libovr_nsb/OVR_Sensor.h>
+#include <libovr_nsb/OVR_HID.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // Quick wrapper to keep the HID stuff somewhat separate

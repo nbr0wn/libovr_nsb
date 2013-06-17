@@ -1,3 +1,3 @@
 AUTOMAKE_OPTIONS = foreign
-SUBDIRS = libovr_nsb/lib libovr_nsb/gl-matrix.c examples
+SUBDIRS = libovr_nsb gl_matrix examples
 ACLOCAL_AMFLAGS = -I m4

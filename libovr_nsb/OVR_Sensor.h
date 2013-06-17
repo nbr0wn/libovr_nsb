@@ -109,9 +109,6 @@ void processTrackerData(Device *dev, TrackerSensors *s);
 void updateOrientation(Device *dev, MessageBodyFrame *msg);
 void GetAngVFilterVal(Device *dev, vec3_t out);
 void ResetAngVFilter(Device *dev );
-Device * openRift( int nthDevice, Device *myDev );
-BOOLEAN sampleDevice( Device *dev );
-BOOLEAN waitSampleDevice(Device *dev, UInt16 waitMsec);
 BOOLEAN processSample(Device *dev, UInt8 *buf, UInt16 len );
 
 #endif

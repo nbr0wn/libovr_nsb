@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include "OVR.h"
+#include <libovr_nsb/OVR.h>
 
 // TODO
 //  |render setup (transforms, view, uniforms, etc)
@@ -1079,9 +1079,8 @@ void *threadFunc( void *data )
 
     while( localDev->runSampleThread )
     {
-        char buf[256];
-		int read = hid_read_timeout(localDev->hidapi_dev, buf, 256, 1000 );
-        processSample(localDev,buf,read);
+        // Try to sample the device for 1ms
+        waitSampleDevice(localDev, 1000);
 
         // Send a keepalive - this is too often.  Need to only send on keepalive interval
         sendSensorKeepAlive(localDev);
