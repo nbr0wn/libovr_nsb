@@ -13,5 +13,5 @@ libovr_nsb_la_SOURCES = \
 						OVR_HID_hidapi.c \
 						OVR_Sensor.c
 
-libovr_nsb_la_LDFLAGS = $(hidapi_LIBS) -no-undefined -release 0.2.0 $(EXTRA_LD_FLAGS) -lm
+libovr_nsb_la_LDFLAGS = $(hidapi_LIBS) -no-undefined -release 0.3.0 $(EXTRA_LD_FLAGS) -lm
 libovr_nsb_la_CPPFLAGS = -fPIC -I$(top_srcdir) $(hidapi_CFLAGS) -Wall -Werror

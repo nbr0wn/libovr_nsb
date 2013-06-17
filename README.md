@@ -1,4 +1,4 @@
-libovr_nsb v0.2.0
+libovr_nsb v0.3.0
 =================
 
 This is a Pure C implementation of the [Oculus Rift](http://oculusvr.com) SDK in static and shared library form.  This library was created to provide access to the drivers and sensor fusion algorithms produced by Oculus VR from basic C functions.
@@ -7,22 +7,41 @@ The library uses the excellent hidapi library for the HID heavy lifting.  I had 
 
 This library also uses [gl-matrix.c](https://github.com/Coreh/gl-matrix.c), which is a permissively-licensed vector/matrix/quat library. This choice was pretty arbitrary.  I didn't want to write one myself and I wanted one with a license that was compatible with the Oculus VR SDK.  Only a handful of functions are actually used for the tracker updates, but having a whole library available is handy.
 
+PRE-BUILT BINARY PACKAGES
+-------------------------
+For now, I only have the following packages:
++[Ubuntu 13.04 64bit deb](http://juggerhost.com/ubuntu_13/libovrnsb_0.3.0_amd64.deb)
++[Ubuntu 13.04 32bit deb](http://juggerhost.com/ubuntu_13/libovrnsb_0.3.0_i686.deb)
++[Ubuntu 12.04LTS 64bit deb](http://juggerhost.com/ubuntu_12/libovrnsb_0.3.0_amd64.deb)
+
 Prerequesites
 --------------
-+ GLUT (for the examples)
++ GLUT (for the examples) - freeglut3 on ubuntu
 + HIDAPI
     - [http://www.signal11.us/oss/hidapi/](http://www.signal11.us/oss/hidapi/)
 
 
+From a base ubuntu install, grab the following packages: 
++g++ 
++gcc 
++make 
++automake 
++libtool 
++freeglut3-dev 
++libudev-dev 
++libusb-1.0-0-dev
+
 Compiling
 ---------
-There is a makefile included which performs the following actions:
+Just type 'make.  The included makefile will perform the following actions
 
     ./autoconf
     ./configure
     make
 
-You can run these separately if you need to provide other arguments such as the location of the hidapi library or headers.
+You can run these separately if you need to provide other arguments such as the location of the hidapi library or headers.  To remove all build files and start over from scratch, do:
+
+    make -f Makefile.clean clean
 
 Excellent idea Shamelessly copied from the [OpenHMD](https://github.com/OpenHMD/OpenHMD) folks:
 
@@ -44,6 +63,14 @@ Installing
 ----------
 
     make install
+
+Usage
+-----
+
+You can make use of the library by including <libovr_nsb/OVR.h> and linking with -lovr_nsb -lgl_matrix
+
+See the examples in the source for further details
+
 
 This will install into $PREFIX.  You'll need to export LD_LIBRARY_PATH to point at $PREFIX/lib in order to run the examples
 
