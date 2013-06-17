@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#include "OVR_Device.h"
+#include <libovr_nsb/OVR_Device.h>
 
 #define OVR_VENDOR 0x2833
 #define OVR_PRODUCT 0x0001

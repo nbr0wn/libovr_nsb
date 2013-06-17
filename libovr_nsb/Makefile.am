@@ -1,4 +1,4 @@
-library_includedir=$(top_builddir)/libovr_nsb/gl-matrix.c
+library_includedir=$(top_builddir)/gl-matrix
 libnsbdir = $(includedir)/libovr_nsb
 libnsb_HEADERS = \
 				 OVR_Defs.h \
@@ -14,4 +14,4 @@ libovr_nsb_la_SOURCES = \
 						OVR_Sensor.c
 
 libovr_nsb_la_LDFLAGS = $(hidapi_LIBS) -no-undefined -release 0.2.0 $(EXTRA_LD_FLAGS) -lm
-libovr_nsb_la_CPPFLAGS = -fPIC -I$(top_srcdir)/libovr_nsb/gl-matrix.c -I$(top_srcdir)/libovr_nsb/lib $(hidapi_CFLAGS) -Wall -Werror
+libovr_nsb_la_CPPFLAGS = -fPIC -I$(top_srcdir) $(hidapi_CFLAGS) -Wall -Werror

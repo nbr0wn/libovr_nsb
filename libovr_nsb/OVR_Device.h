@@ -8,9 +8,9 @@
 #include <math.h>
 
 #include <hidapi/hidapi.h>
-#include <gl-matrix.h>
+#include <gl-matrix/gl-matrix.h>
 
-#include "OVR_Defs.h"
+#include <libovr_nsb/OVR_Defs.h>
 
 
 

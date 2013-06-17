@@ -38,27 +38,27 @@ Device * openRiftHID( int nthDevice, Device *myDev )
             dev->vendorId = cur_dev->vendor_id;
             dev->productId = cur_dev->product_id;
 
-            printf("\n\nDevice Found:\n");
+            //printf("\n\nDevice Found:\n");
 
             // Read the Manufacturer String
             hid_get_manufacturer_string(dev->hidapi_dev, wstr, MAX_STR);
-            printf("Manufacturer:  %ls\n", wstr);
+            //printf("Manufacturer:  %ls\n", wstr);
             dev->name = malloc(sizeof(wchar_t) * wcslen(wstr) + 1);
             wcstombs(dev->name, wstr, wcslen(wstr));
 
             // Read the Product String
             hid_get_product_string(dev->hidapi_dev, wstr, MAX_STR);
-            printf("Product:       %ls\n", wstr);
+            //printf("Product:       %ls\n", wstr);
             dev->product = malloc(sizeof(wchar_t) * wcslen(wstr) + 1);
             wcstombs(dev->product, wstr, wcslen(wstr));
 
             // Read the Serial Number String
             hid_get_serial_number_string(dev->hidapi_dev, wstr, MAX_STR);
-            printf("Serial Number: %ls", wstr);
+            //printf("Serial Number: %ls", wstr);
             dev->serial = malloc(sizeof(wchar_t) * wcslen(wstr) + 1);
             wcstombs(dev->serial, wstr, wcslen(wstr));
 
-            printf("\n\n");
+            //printf("\n\n");
             break;
         }
         nthDevice--;
@@ -201,6 +201,7 @@ BOOLEAN getSensorInfo( Device *dev )
         dev->sensorInfo.DistortionK[4]          = DecodeFloat(Buffer+48);
         dev->sensorInfo.DistortionK[5]          = DecodeFloat(Buffer+52);
 
+#if 0
         printf ("\nSensor Info:\n");
 		for (i = 0; i < res; i++)
 			printf("%hhx ", Buffer[i]);
@@ -208,6 +209,7 @@ BOOLEAN getSensorInfo( Device *dev )
 
         printf ("\nR: %d x %d", dev->sensorInfo.HResolution, dev->sensorInfo.VResolution );
         printf ("\tS: %f x %f\n", dev->sensorInfo.HScreenSize, dev->sensorInfo.VScreenSize );
+#endif
     }
     return TRUE;
 }

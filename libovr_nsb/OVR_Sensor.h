@@ -7,10 +7,10 @@
 #include <errno.h>
 #include <math.h>
 
-#include <gl-matrix.h>
+#include <gl-matrix/gl-matrix.h>
 
-#include "OVR_Defs.h"
-#include "OVR_Device.h"
+#include <libovr_nsb/OVR_Defs.h>
+#include <libovr_nsb/OVR_Device.h>
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Message Structs

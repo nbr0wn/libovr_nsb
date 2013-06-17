@@ -510,21 +510,10 @@ void GetAngVFilterVal(Device *dev, vec3_t out)
     vec3_add(out,temp,0);
 	vec3_scale(dev->AngVFilterHistory[7], -0.16667f, temp);
     vec3_add(out,temp,0);
-
-	// Filtered value (Savitsky-Golay derivative)
-	//out = 
-	//(dev->AngVFilterHistory[0] *  0.41667f) +
-	//(dev->AngVFilterHistory[1] *  0.33333f) +
-	//(dev->AngVFilterHistory[2] *  0.025f) +
-	//(dev->AngVFilterHistory[3] *  0.16667f) +
-	//(dev->AngVFilterHistory[4] *  0.08333f) +
-	//(dev->AngVFilterHistory[5] *  0.0f) +
-	//(dev->AngVFilterHistory[6] * -0.08333f) +
-	//(dev->AngVFilterHistory[7] * -0.16667f);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////
-// Read a single tracker info me
+// Read a single tracker info message
 /////////////////////////////////////////////////////////////////////////////////////
 BOOLEAN sampleDevice( Device *dev )
 {
@@ -570,50 +559,3 @@ BOOLEAN processSample(Device *dev, UInt8 *buf, UInt16 len )
     }
     return TRUE;
 }
-
-/*
-/////////////////////////////////////////////////////////////////////////////////////
-// Continuous sample/update thread code
-// select() chosen for portability
-/////////////////////////////////////////////////////////////////////////////////////
-void *threadFunc( void *data )
-{
-    Device *dev = (Device *)data;
-    fd_set readset;
-    struct timeval waitTime;
-
-    // 500ms
-    waitTime.tv_sec = 0;
-    waitTime.tv_usec = 500000;
-
-    FD_ZERO(&readset);
-    FD_SET(dev->fd,&readset);
-
-    while( dev->runSampleThread )
-    {
-        waitTime.tv_sec = 0;
-        waitTime.tv_usec = 500000;
-        int result = select(dev->fd + 1, &readset, NULL, NULL, &waitTime );
-
-        if ( result && FD_ISSET( dev->fd, &readset ) )
-        {
-            sampleDevice(dev);
-        }
-        // Send a keepalive - this is too often.  Need to only send on keepalive interval
-        sendSensorKeepAlive(dev);
-        //printf("Keepalive\n");
-    }
-    return 0;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////
-// Tracker thread function
-/////////////////////////////////////////////////////////////////////////////////////////////
-void runSensorUpdateThread( Device *dev )
-{
-    pthread_t f1_thread; 
-    dev->runSampleThread = TRUE;
-    pthread_create(&f1_thread,NULL,threadFunc,dev);
-}
-
-*/
