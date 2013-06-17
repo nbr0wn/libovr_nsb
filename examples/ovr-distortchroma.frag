@@ -1,3 +1,5 @@
+#version 130
+
 uniform sampler2D texSrc;
 uniform vec2 lensCenter;
 uniform vec2 screenCenter;
@@ -6,7 +8,7 @@ uniform vec2 scaleIn;
 uniform vec4 distortK;
 uniform vec4 chromaK;
 
-varying vec2 v_uv;
+in vec2 v_uv;
 
 // Shader with just lens distortion correction.
 void main(){

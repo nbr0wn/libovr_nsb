@@ -19,9 +19,11 @@ void main(void){
     float distort = distortK.x + (distortK.y + (distortK.z + distortK.w * r2) * r2) * r2;
     vec2  uv = lensCenter + theta * (distort * scale);
 
+    /*
     vec2 bound = vec2(0.25,0.5);
     if(any(lessThan(uv, screenCenter-bound))) discard;
     if(any(greaterThan(uv, screenCenter+bound))) discard;
+    */
 
     gl_FragColor = texture2D( texSrc, uv );
 }

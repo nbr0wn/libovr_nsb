@@ -1,6 +1,5 @@
-#include <GL/gl.h>
-#include <GL/glext.h>
-#include <GL/freeglut.h>
+#define _GNU_SOURCE  // for sincos
+
 #include <stdlib.h>
 #include <math.h>
 #include <stdio.h>
@@ -8,6 +7,57 @@
 
 #include <libovr_nsb/OVR.h>
 
+// to USE_SDL, linking must include -lSDL rather than -lglut
+//#define USE_SDL
+#ifdef USE_SDL
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <SDL/SDL.h>
+#else
+#include <GL/freeglut.h>
+#endif
+
+// Define TERRAIN for a mountainous heightfield scene; otherwise
+// the scene is simply a few squares
+#define TERRAIN
+
+// Define STEREO for stereo+distortion; otherwise undistorted single view
+#define STEREO
+
+// Layout of this file:
+//
+//   Miscellaneous util-functions
+//
+//   Modern OpenGL abstractions:
+//     Shader Load, Compile, Link
+//     Buffer Object
+//     Vertex Attributes
+//     Textures, Framebuffers, and Renderbuffers
+//     View (viewport) and offscreen buffer
+//
+//   Model structures
+//
+//   --------------------------
+//
+//   Global State
+//
+//   Stereo-lens functions translated from OVR SDK
+//
+//   Rendering
+//
+//   Main
+//
+//   --------------------------
+//
+//   Procedural Texturing
+//
+//   Tesselation
+//
+//   Terrain Generation
+//
+
+
+// ------------------------------------
 // TODO
 //  |render setup (transforms, view, uniforms, etc)
 //  |texture params
@@ -15,10 +65,16 @@
 //  |stereo
 //  |distortion
 //  |add 'discard' to distort shaders
+//  |aspect has a problem -- a 2/3 ratio is required where it should be 1/2
+//  |limit vertex recomputation
 //  /add movement -- probably best to leave this for a demo using SDL
 //  -create shapes
-//    -fractal terrain
-//  -aspect has a problem -- a 2/3 ratio is required where it should be 1/2
+//    |fractal terrain
+//    |change head-height with underlying terrain
+//    -skydome
+//  -lighting
+//  -OpenAL audio
+//
 //  -set Distortion struct from HMD info
 //  -fix resize
 //  -rather than GetAttribLocation, use BindAttribLocation (do before linking)
@@ -26,16 +82,19 @@
 //  -breakout GL stuff into gltools.c?
 //  -properly clean-up resources (buffers, textures, mallocs)
 //  -fix any remaining FIXME's and TODO's; check XXX's.
+//  -make code easier to read
 
 
-void idleFunc( );
 void displayFunc( );
+#ifndef USE_SDL
+void idleFunc( );
 void reshapeFunc( GLsizei width, GLsizei height );
 void keyboardFunc( unsigned char, int, int );
 void mouseFunc( int button, int state, int x, int y );
+#endif
+
 void initGL( );
 void initialize( );
-
 
 /* ---------------------------------------------------------------- */
 
@@ -52,7 +111,7 @@ void printOGLError( char *file, int line ){
       printf( "glError in file %s, line %d: %s (0x%08x)\n", file, line, gluErrorString(err), err );
 }
 
-
+// convert to OpenGL float matrix, from gl-matrix.c double
 void oglMatrix( mat4_t m, float *f ){
    int i;
    for( i=0;i<16;i++ ) f[i] = m[i];
@@ -69,7 +128,7 @@ void printMatrix( float *m ){
 void showUniforms( GLuint prog ){
    int total = -1;
    glGetProgramiv( prog, GL_ACTIVE_UNIFORMS, &total ); 
-   //printf( "Uniforms for program %d:\n" );
+   printf( "Uniforms for program %d:\n" );
    int i;
    char name[128];
    for( i=0; i<total; i++ ){
@@ -83,7 +142,6 @@ void showUniforms( GLuint prog ){
       }
    }
 }
-
 
 // used for shader loading
 char *loadText( char *fname ){
@@ -264,6 +322,8 @@ VFormat vtxNewFormat( GLuint prog, int count, VDesc desc[] ){
    return fmt;
 }
 
+// Note that "disable" is not required as long as enable is captured as part
+// of the VAO state.
 void vtxEnable( VFormat *fmt ){
    int i;
    VAttrib *a = fmt->attr;
@@ -273,6 +333,12 @@ void vtxEnable( VFormat *fmt ){
    }
 }
 
+void vtxDisable( VFormat *fmt ){
+   int i;
+   VAttrib *a = fmt->attr;
+   for( i=0; i<fmt->attribs; i++ )
+      glDisableVertexAttribArray( a[i].idx );
+}
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -309,9 +375,19 @@ GLuint texNew( GLint filter, GLint wrapS, GLint wrapT ){
 
 GLuint texCreate( GLint intern, GLenum form, GLenum typ, GLsizei w, GLsizei h, GLint filter, GLint wrapS, GLint wrapT, const GLvoid *data ){
    GLuint idx = texNew( filter, wrapS, wrapT );
-   glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter );
+   glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
    glTexImage2D( GL_TEXTURE_2D, 0, intern, w, h, 0, form, typ, data );
+   glBindTexture( GL_TEXTURE_2D, 0 );
+   return idx;
+}
+
+GLuint texCreateMip( GLint intern, GLenum form, GLenum typ, GLsizei w, GLsizei h, GLint filter, GLint wrapS, GLint wrapT, const GLvoid *data ){
+   GLuint idx = texNew( filter, wrapS, wrapT );
+   glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR );
+   glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
+   glTexImage2D( GL_TEXTURE_2D, 0, intern, w, h, 0, form, typ, data );
+   glGenerateMipmap( GL_TEXTURE_2D );
    glBindTexture( GL_TEXTURE_2D, 0 );
    return idx;
 }
@@ -386,6 +462,7 @@ GLuint fboCreateWithDepth( GLuint texture, GLuint depth ){
 //delete: glDeleteFramebuffers( n, array );
 
 
+
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Renderable
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -415,27 +492,24 @@ struct RList_s {
 
 // Bind all attributes to the vertex array object (VAO)
 void renderBindVao( Renderable *r ){
+   glBindBuffer( GL_ARRAY_BUFFER, r->vbo );
+
+	// set ibo and vertex attribs to be captured by VAO
    glGenVertexArrays( 1, &r->vao );
    glBindVertexArray( r->vao );
-   glBindBuffer( GL_ARRAY_BUFFER, r->vbo );
-   glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, r->ibo );
    vtxEnable( r->fmt );
+   glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, r->ibo );
    glBindVertexArray(0);
+
+	// reset state
+	vtxDisable( r->fmt );
+   glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+   glBindBuffer( GL_ARRAY_BUFFER, 0 );
 }
 
 void renderableAddTex( Renderable *r, char *uname, GLuint tex ){
    r->tex = tex;
    r->u_tex = glGetUniformLocation( r->prog, uname );
-}
-
-void renderableStream( Renderable *r, int verts, float *vdata, int indices, GLushort *idata ){
-   glBindBuffer( GL_ARRAY_BUFFER, r->vbo );
-   glBufferSubData( GL_ARRAY_BUFFER, 0, verts * r->fmt->stride, vdata );
-   glBindBuffer( GL_ARRAY_BUFFER, 0 );
-   glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, r->ibo );
-   glBufferSubData( GL_ELEMENT_ARRAY_BUFFER, 0, indices*sizeof(GLushort), idata );
-   glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
-   r->count = indices;
 }
 
 // Assumes GL_TRIANGLES, u16 indices, and GL_STATIC_DRAW, since that's typical
@@ -460,8 +534,10 @@ void renderObj( Renderable *r ){
    if( r->tex ) texBind( 0, r->u_tex, r->tex );
    glBindVertexArray( r->vao );
    glDrawElements( r->mode, r->count, r->type, 0 );
+	glBindVertexArray( 0 );
    if( r->tex ) texUnbind( 0 );
 }
+
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -485,7 +561,6 @@ View frameBuffer( GLsizei w, GLsizei h ){
 
 View offscreenBuffer( GLint filter, GLsizei w, GLsizei h ){
    GLuint rgba = texCreateTarget( TEX_BYTE4, w, h, filter, TEX_CLAMP );
-   //GLuint rgba = texCreateTarget( filter, GL_MIRRORED_REPEAT, GL_MIRRORED_REPEAT, TEX_BYTE4, w, h );
    GLuint depth = rbNew( GL_DEPTH_COMPONENT, w, h );
    GLuint fbo = fboCreateWithDepth( rgba, depth );
    return (View){ 0, 0, w, h, 1, rgba, depth, fbo };
@@ -499,7 +574,41 @@ void freeOffscreenBuffer( View *v ){
 
 
 
-/* ----------------------------------------------------------------------- */
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Model structures, for representing deformable heightfield (or more)
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+#define MAX_ADJ 7
+
+typedef struct {
+   float p[3];  // current x,y,z
+   float hgt;   // target height (y)
+   float vel;   // current velocity
+   unsigned short adj[MAX_ADJ];  // indices of adjacent faces
+   unsigned short faces;         // number of adjacent faces
+} Vert;
+
+typedef struct {
+   float n[3];
+   unsigned short a,b,c;
+   unsigned short reserved;
+} Face;
+
+typedef struct {
+   GLfloat*  vdata;
+   GLushort* idata;
+   Vert *v;
+   Face *f;
+   int verts;
+   int faces;
+   Renderable r;
+   int updateIndices;
+} Model;
+
+// Terrain functions which are defined waaay below...
+Model *genTerrain( GLuint prog, VFormat *fmt, int maxTess, float scale );
+void   modelUpdate( Model *m, float dt );
+float  heightAt( Model *m, float x, float z, int *phint );
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -529,6 +638,8 @@ double g_head[3] = { 0., 0., 0. }; // world-pos of base of head
 // - intially set with a reference orientation of 90deg pitch which seems to
 //   correspond to the Rift's natural orientation
 double g_qref[4] = { -0.7071, 0., 0., 0.7071 };
+
+Model *g_terrain = NULL;
 
 
 
@@ -592,6 +703,133 @@ void initGL()
     glEnable( GL_BLEND );
 }
 
+
+// These are target values; not current values
+double g_targetHeading = 0.;
+double g_lftfoot = 0.;
+double g_rgtfoot = 0.;
+// TODO left/right foot stepping isn't really utilized yet
+
+double g_heading = 0.;
+
+// heading is turned into xz-direction
+void vecOfHeading( double heading, double step, double *dir ){
+   double s,c; sincos( heading, &s, &c );
+   dir[0] = -s * step;
+   dir[1] = 0.;
+   dir[2] = -c * step;
+}
+
+void quatOfHeading( double heading, double *q ){
+   double s,c; sincos( heading*0.5, &s, &c );
+   q[0] = 0.;
+   q[1] = s;
+   q[2] = 0.;
+   q[4] = c;
+}
+
+double angleDiff( double a, double b ){
+   double x = a - b;
+   if( x < M_PI && x >= -M_PI) return x;
+   double twoPi = M_PI + M_PI;
+   double y = x + M_PI;
+   double n = floor(y / twoPi);
+   return y - n * twoPi - M_PI;
+}
+
+#ifdef USE_SDL
+int processEvents( void ){
+   SDL_Event event;
+
+   while(SDL_PollEvent(&event)){
+      switch(event.type){
+         case SDL_KEYDOWN:
+            switch(event.key.keysym.sym){
+               case SDLK_ESCAPE:
+                  return 0;
+               default: break;
+            }
+            break;
+         case SDL_MOUSEMOTION:
+            //gCursX = event.motion.x;
+            //gCursY = event.motion.y;
+            break;
+         case SDL_MOUSEBUTTONDOWN:
+         case SDL_MOUSEBUTTONUP:
+            // SDL_BUTTON_LEFT, SDL_BUTTON_MIDDLE, SDL_BUTTON_RIGHT
+            // SDL_BUTTON_WHEELUP, SDL_BUTTON_WHEELDOWN
+            break;
+         case SDL_VIDEORESIZE:
+            //setDisplay(rendState,event.resize.w,event.resize.h);
+            //redraw = 1;
+            break;
+         case SDL_QUIT:
+            return 0;
+         default: break;
+		}
+	}
+	return 1;
+}
+
+#else
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
+void keyboardFunc( unsigned char key, int x, int y )
+{
+    switch( key )
+    {
+        case 27:  // Why the hell doesn't glut have GLUT_KEY_ESC?
+        case 'q':
+            exit( 0 );
+            break;
+        case '.':
+            if(dev){
+               double qm[16];
+               float m[16];
+               printf("Q Matrix:\n");
+               quat_toMat4( dev->Q, qm );
+               oglMatrix( qm, m );
+               printMatrix( m );
+               printf("q: x= %6.3f y= %6.3f z= %6.3f w= %6.3f\n", dev->Q[0], dev->Q[1], dev->Q[2], dev->Q[3] );
+               // set this rotation as reference
+               // -NOTE that this generally results in off-kilter "ground
+               //  plane" which can be nauseating -- should probably apply
+               //  gravity sense from linear accelerometer.
+               quat_set( dev->Q, g_qref );
+               quat_conjugate( g_qref, NULL );
+               quat_normalize( g_qref, NULL );
+            }
+            break;
+
+        case 'a': // left foot forward
+            g_lftfoot += 1.f;
+            break;
+        case 's': // right foot forward
+            g_rgtfoot += 1.f;
+            break;
+        case 'z': // left foot back
+            g_lftfoot -= 0.5f;
+            break;
+        case 'x': // right foot back
+            g_rgtfoot -= 0.5f;
+            break;
+        case ' ': // turn to facing
+            if( dev ){
+               double orient[4];
+               double facing[] = {0., 0., -1.};
+               quat_set( dev->Q, orient );
+               quat_multiply( orient, g_qref, NULL ); // apply inverse-reference orientation
+               quat_multiplyVec3( orient, facing, NULL );
+               g_targetHeading = atan2f( -facing[0], -facing[2] );
+            }
+            break;
+
+    }
+
+    glutPostRedisplay( );
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Handle window resizes
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -616,49 +854,6 @@ void reshapeFunc( GLsizei w, GLsizei h )
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////
-void keyboardFunc( unsigned char key, int x, int y )
-{
-    switch( key )
-    {
-        case 27:  // Why the hell doesn't glut have GLUT_KEY_ESC?
-        case 'q':
-            exit( 0 );
-            break;
-        case ' ':
-            if(dev){
-               double qm[16];
-               float m[16];
-               printf("Q Matrix:\n");
-               quat_toMat4( dev->Q, qm );
-               oglMatrix( qm, m );
-               printMatrix( m );
-               printf("q: x= %6.3f y= %6.3f z= %6.3f w= %6.3f\n", dev->Q[0], dev->Q[1], dev->Q[2], dev->Q[3] );
-               // set this rotation as reference
-               // -NOTE that this generally results in off-kilter "ground
-               //  plane" which can be nauseating -- should probably apply
-               //  gravity sense from linear accelerometer.
-               quat_set( dev->Q, g_qref );
-               quat_conjugate( g_qref, NULL );
-               quat_normalize( g_qref, NULL );
-            }
-            break;
-        case 'w':
-            break;
-        case 'a':
-            break;
-        case 's':
-            break;
-        case 'd':
-            break;
-    }
-
-    glutPostRedisplay( );
-}
-
-
-
-/////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////
 void mouseFunc( int button, int state, int x, int y )
 {
     glutPostRedisplay( );
@@ -673,9 +868,12 @@ void idleFunc( )
     glutPostRedisplay( );
 }
 
+#endif
 
 
-/* ================ Imports from stereo.c =================== */
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Stereo-lens functions translated from OVR SDK
+/////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO remove this once we use stereo.c
 
@@ -746,7 +944,7 @@ void projectionMatrix( View *vp, SensorDisplayInfo *hmd, Distortion *d, int ster
     double zFar  = 500.;
 
     double aspect = (double)(vp->wid) / (double)(vp->hgt);
-    if( stereo ) aspect*= 0.65; // FIXME -- this should be 0.5... what's up?
+    if( stereo ) aspect*= 0.5;
 
     double fovy = 80.;
     if( stereo ){
@@ -824,7 +1022,6 @@ void render( RList *r, mat4_t view, mat4_t proj ){
 
       r = r->next;
    }
-   glBindVertexArray( 0 ); // unbind any currently bound VAO
 
    glUseProgram(0);
 }
@@ -845,7 +1042,7 @@ void mapDistortion( GLuint src, Distortion *d, View *v ){
 
    // One-time setup, which could be better done as a distortion-mapping state
    if( !distortShader ){
-      distortShader = shaderProgram( COUNTED_ARRAY(shdrDistortChroma) );
+      distortShader = shaderProgram( COUNTED_ARRAY(shdrDistort) );
       v3t2 = vtxNewFormat( distortShader, COUNTED_ARRAY(desc) );
       vbo = newBufObj( GL_ARRAY_BUFFER, BYTE_ARRAY(screenVerts), GL_STATIC_DRAW );
 
@@ -865,11 +1062,14 @@ void mapDistortion( GLuint src, Distortion *d, View *v ){
       // it seems VAOs aren now REQUIRED to render anything!? (OpenGL4.2 core?)
       // -- at least, no rendering seems to work without a VAO bound
       // -- so set one up for the screen quad...
+		// XXX This might have been because I had leaky state (vtxEnable, perhaps)
+      glBindBuffer( GL_ARRAY_BUFFER, vbo );
       glGenVertexArrays( 1, &vao );
       glBindVertexArray( vao );
-      glBindBuffer( GL_ARRAY_BUFFER, vbo );
       vtxEnable( &v3t2 );
       glBindVertexArray( 0 );
+      vtxDisable( &v3t2 );
+      glBindBuffer( GL_ARRAY_BUFFER, 0 );
 
       //showUniforms( distortShader );
    }
@@ -907,7 +1107,7 @@ void mapDistortion( GLuint src, Distortion *d, View *v ){
    a[1] = y+h*0.5f;
    glUniform2fv( u_screenCenter, 1, a );
    a[0] = w*0.5f*scaleFactor;
-   a[1] = h*0.5f*scaleFactor;
+   a[1] = h*0.5f*scaleFactor*as;
    glUniform2fv( u_scale, 1, a );
    a[0] = 2.0f/w;
    a[1] = 2.0f/(h*as);
@@ -936,7 +1136,7 @@ void mapDistortion( GLuint src, Distortion *d, View *v ){
    glViewport( v->x0, v->y0, v->wid, v->hgt );
 
    // (distorted) copy to the framebuffer ignores depth and blending
-   glDepthMask( GL_FALSE );
+   glDisable( GL_DEPTH_TEST );
    glDisable( GL_BLEND );
 
    texBind( 0, u_texSrc, src );
@@ -948,7 +1148,7 @@ void mapDistortion( GLuint src, Distortion *d, View *v ){
    texUnbind( 0 );
 
    glEnable( GL_BLEND );
-   glDepthMask( GL_TRUE );
+   glEnable( GL_DEPTH_TEST );
 
 }
 
@@ -962,6 +1162,29 @@ void viewOfPosOrient( vec3_t p, quat_t q, mat4_t dst ){
    mat4_fromRotationTranslation( qinv, neg, dst );
 }
 
+int localVIdx = 0;
+
+// turn left/right footsteps into g_head results
+void move( void ){
+   // g_heading must accommodate changes in g_targetHeading
+   double da = angleDiff( g_targetHeading, g_heading );
+   double da_step = da < 0.05 ? (da > -0.05 ? da : -0.05) : 0.05;
+   g_heading+= da_step;
+
+   // target position is between feet in direction of "g_heading"
+   double avg = 0.5 * (g_lftfoot + g_rgtfoot);
+
+   double step = avg < 0.05 ? (avg > -0.05 ? avg : -0.05) : 0.05;
+
+   g_lftfoot-= step;
+   g_rgtfoot-= step;
+   double v[3];
+   vecOfHeading( g_heading, step, v );
+   vec3_add( g_head, v, NULL );
+
+   g_head[1] = 1.8f + heightAt( g_terrain, g_head[0], g_head[2], &localVIdx );
+}
+
 void displayFunc( )
 {
    double eye[16];
@@ -970,16 +1193,31 @@ void displayFunc( )
 
    assert(fb); // we at least require the framebuffer to be defined
 
+#ifdef TERRAIN
+   modelUpdate( g_terrain, 1.f/60.f );
+
+   //g_head[1] = 1.8f + heightAt( g_terrain, g_head[0], g_head[2], &localVIdx );
+   move();
+#endif
+
    // Orientation, from HMD sensor
-   double orient[4];
-   quat_set( dev->Q, orient );
-   quat_multiply( orient, g_qref, NULL ); // apply inverse-reference orientation
+   double orient[4] = { 0., 0., 0., 1. };
+	if( dev ){
+		quat_set( dev->Q, orient );
+		quat_multiply( orient, g_qref, NULL ); // apply inverse-reference orientation
+	}
+
+   /*
+   double qheading[4];
+   quatOfHeading( -g_heading, qheading );
+   quat_multiply( orient, qheading, NULL );
+   */
 
    if( bb && bb->offscreen && fboBind(bb->fbo) ){
       /* Offscreen stereo render with distortion */
 
       // clear the color and depth buffers
-      glClearColor( 0.02, 0.05, 0.1, 0.0 );
+      glClearColor( 0.45, 0.5, 0.8, 0.0 );
       glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
       double proj[16];
@@ -1041,7 +1279,7 @@ void displayFunc( )
    }else{
 
       /* Direct framebuffer render with no stereo or distortion */
-      glClearColor( 0.02, 0.05, 0.1, 0.0 );
+      glClearColor( 0.45, 0.5, 0.8, 0.0 );
       glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
       glViewport( 0.0f, 0.0f, fb->wid, fb->hgt );
@@ -1051,7 +1289,12 @@ void displayFunc( )
    }
 
    glFlush( );
+
+#ifdef USE_SDL
+	SDL_GL_SwapBuffers();
+#else
    glutSwapBuffers( );
+#endif
 }
 
 
@@ -1113,28 +1356,17 @@ void initialize()
 }
 
 
-
-//  procedural textures...
+// Procedural textures...
 
 GLuint proceduralTex( int w, int h, void (*fn)(double,double,double,unsigned char*) );
 double perlin( double x, double y, double z );
-
-/* Bias values 'x' in 0-1 range using a gamma function. 0 <= b <= 1
- *  b = 0.5 is identity;
- *  b > 0.5 biases upward;
- *  b < 0.5 biases downward;
- */
-double bias( double x, double b ){
-   if( x <= 0. ) return 0.;
-   return pow( x, log(b) / log(0.5) );
-}
 
 void fn1( double x, double y, double z, unsigned char *d ){
    double s = 40.;
    double a = 0.6 * perlin(x*s,y*s,z*s);
    s*= 2.13;
    a+= 0.1 * perlin(x*s,y*s,z*s);
-   a = 0.9 - fabs(a); //bias( fabs(a), 0.5 );
+   a = 0.9 - fabs(a);
    double b = 0.8 + 0.2 * perlin(x*3.,y*2.,z+7.2);
    int n = (int)(a*b*255.99);
    d[0] = n;
@@ -1159,6 +1391,7 @@ void fn2( double x, double y, double z, unsigned char *d ){
    d[3] = 255;
 }
 
+
 //-----------------------------------------------------------------------------
 // Name: main( )
 // Desc: entry point
@@ -1168,13 +1401,27 @@ int main( int argc, char ** argv )
     dev = (Device *)malloc(sizeof(Device));
     runSensorUpdateThread(dev);
 
-    glutInitContextVersion( 4, 2 );
+#ifdef USE_SDL
+    if( SDL_Init(SDL_INIT_VIDEO) < 0 ){
+        fprintf(stderr,"Failed SDL init: %s\n",SDL_GetError());
+        exit(1);
+    }
+    atexit(SDL_Quit);
+
+    SDL_Surface *screen = SDL_SetVideoMode( g_width, g_height, 0, SDL_OPENGL|SDL_DOUBLEBUF );
+    if(!screen){
+        fprintf(stderr,"Failed SDL video mode request: %s\n",SDL_GetError());
+        exit(1);
+    }
+#else
+    glutInitContextVersion( 3, 3 );
     glutInitContextFlags( GLUT_CORE_PROFILE | GLUT_DEBUG );
     glutInit( &argc, argv );
     glutInitDisplayMode( GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH );
     glutInitWindowSize( g_width, g_height );
     glutInitWindowPosition( 0, 0 );
     glutCreateWindow( argv[0] );
+    glutFullScreen();
 
     // Set up our callbacks
     glutIdleFunc( idleFunc );
@@ -1182,6 +1429,7 @@ int main( int argc, char ** argv )
     glutReshapeFunc( reshapeFunc );
     glutKeyboardFunc( keyboardFunc );
     glutMouseFunc( mouseFunc );
+#endif
 
     // Local init
     initialize();
@@ -1198,7 +1446,7 @@ int main( int argc, char ** argv )
     //  use of uniform variables is consistent
     GLuint shader = shaderProgram( COUNTED_ARRAY(shdrNoLight) );
 
-    showUniforms( shader );
+    //showUniforms( shader );
 
     // New vertex format
     VDesc desc[] =
@@ -1208,16 +1456,34 @@ int main( int argc, char ** argv )
     VFormat v3c4t2 = vtxNewFormat( shader, COUNTED_ARRAY(desc) );
 
 
+    // Create some textures
+    GLuint tex1 = proceduralTex( 512, 512, fn1 );
+    GLuint tex2 = proceduralTex( 512, 512, fn2 );
+
+
+#ifdef TERRAIN
+    // Terrain
+    int maxTess = 7; // to go higher would require larger index format (uint32)
+    float scale = 100.;
+    g_terrain = genTerrain( shader, &v3c4t2, maxTess, scale );
+    renderableAddTex( &g_terrain->r, "rgbaMap", tex2 );
+#endif
+
+
     // Objects to render
     Renderable square = renderableCreate( shader, &v3c4t2, BYTE_ARRAY(squareVerts), BYTE_ARRAY(squareIdx), GL_STATIC_DRAW );
     Renderable floor = square;
-
-    // Create a texture
-    GLuint tex1 = proceduralTex( 512, 512, fn1 );
-    GLuint tex2 = proceduralTex( 512, 512, fn2 );
     renderableAddTex( &square, "rgbaMap", tex2 );
     renderableAddTex( &floor, "rgbaMap", tex1 );
 
+
+#ifdef TERRAIN
+    RList r0;
+    r0.rend = &g_terrain->r;
+    mat4_identity( r0.mtx );
+    r0.next = NULL;
+    g_renderList = &r0;
+#else
 
     RList r0,r1,r2,r3,r4;
 
@@ -1257,6 +1523,7 @@ int main( int argc, char ** argv )
     r4.next = &r3;
 
     g_renderList = &r4;
+#endif
 
 
     // Describe viewport/buffers to render into
@@ -1267,7 +1534,6 @@ int main( int argc, char ** argv )
     g_framebuffer = &framebuffer;
 
     int stereo = 0;
-#define STEREO
 #ifdef STEREO
     stereo = 1;
     View backbuffer = offscreenBuffer( GL_LINEAR, 1600, 1000 );
@@ -1283,20 +1549,32 @@ int main( int argc, char ** argv )
     projectionMatrix( g_framebuffer, displayInfo, &g_defaultDistort, stereo, g_proj );
 
 
+#ifdef USE_SDL
+	 while( processEvents() ){
+		  displayFunc();
+		  // TODO force retrace sync
+	 }
+#else
     // Go Glut
     glutMainLoop();
+#endif
 
     // FIXME mainloop isn't exited -- we should add sane cleanup (a lot more
     // than the offscreen-buffer...)
     if( g_backbuffer )
        freeOffscreenBuffer( g_backbuffer );
 
+#ifdef USE_SDL
+	 SDL_Quit();
+#endif
     return 0;
 }
 
 
 
-/* ----------------- Procedural Texturing ------------------------- */
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Procedural Texturing
+/////////////////////////////////////////////////////////////////////////////////////////////
 
 GLuint proceduralTex( int w, int h, void (*fn)(double,double,double,unsigned char*) ){
    GLuint tex = 0;
@@ -1311,7 +1589,7 @@ GLuint proceduralTex( int w, int h, void (*fn)(double,double,double,unsigned cha
       }
       row+= w * 4;
    }
-   tex = texCreate( TEX_BYTE4, w, h, GL_LINEAR, TEX_CLAMP, texdata );
+   tex = texCreateMip( TEX_BYTE4, w, h, GL_LINEAR, TEX_MIRROR, texdata );
    free( texdata );
    return tex;
 }
@@ -1370,5 +1648,618 @@ double perlin( double x, double y, double z ){
                                   grad(pmt[BA+1], x-1, y  , z-1 )),
                           lerp(u, grad(pmt[AB+1], x  , y-1, z-1 ),
                                   grad(pmt[BB+1], x-1, y-1, z-1 ))));
+}
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Heightfield tesselation
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+#define SQRT3BY3 (0.5773502692f)
+
+// Some integer and bit-fiddling functions
+
+uint32_t bitmaskFill( uint32_t n ){
+  n|= n >> 1;
+  n|= n >> 2;
+  n|= n >> 4;
+  n|= n >> 8;
+  return n | (n >> 16);
+}
+
+uint32_t roundPow2( uint32_t n ){ return 1 + bitmaskFill(n-1); }
+int isPow2( uint32_t n ){ return ((n & (n-1)) == 0); }
+uint32_t sumToN( uint32_t n ){ return ((n*n+n) >> 1); }
+
+uint32_t interleaveBits( uint32_t x, uint32_t y ){
+   static const uint32_t B[] = {0x55555555, 0x33333333, 0x0F0F0F0F, 0x00FF00FF};
+   static const uint32_t S[] = {1, 2, 4, 8};
+   x = (x | (x << S[3])) & B[3];
+   x = (x | (x << S[2])) & B[2];
+   x = (x | (x << S[1])) & B[1];
+   x = (x | (x << S[0])) & B[0];
+   y = (y | (y << S[3])) & B[3];
+   y = (y | (y << S[2])) & B[2];
+   y = (y | (y << S[1])) & B[1];
+   y = (y | (y << S[0])) & B[0];
+   return x | (y << 1);
+}
+
+
+// Simple hashtable to map a key to an index
+
+typedef struct {
+   uint32_t mask; // size-1, where size is 2^n
+   uint32_t table[1];
+} Hashtable;
+
+Hashtable *hashCreate( uint32_t size ){
+   Hashtable *h = NULL;
+   if( size > 0 && isPow2(size) ){
+      h = (Hashtable*)calloc( sizeof(Hashtable) + (size-1) * sizeof(uint32_t), 1 );
+      h->mask = size-1;
+   }
+   return h;
+}
+
+uint32_t hashHsieh( uint32_t hash ){
+	hash ^= hash << 3;
+	hash += hash >> 5;
+	hash ^= hash << 4;
+	hash += hash >> 17;
+	hash ^= hash << 25;
+	hash += hash >> 6;
+	return hash;
+}
+
+// this is used for store and retrieval, returning the index for a key
+// -keys must be nonzero
+uint32_t hashIndex( Hashtable *h, uint32_t key ){
+   uint32_t idx = hashHsieh(key) & h->mask;
+   uint32_t *ht = h->table;
+   while( ht[idx] ){
+      if( ht[idx] == key ) return idx;
+      idx = (idx+1) & h->mask;
+   }
+   ht[idx] = key;
+   return idx;
+}
+
+
+// Tesselation
+
+typedef float (*HeightFn)(float*,float,float);
+
+void initVertXZ( Vert *v, float x, float z ){
+   memset( v, 0, sizeof(Vert) );
+   v->p[0] = x;
+   v->p[2] = z;
+   v->faces = 0;
+}
+
+void adjAdd( Vert *v, int iAdd ){
+   int i;
+   for( i=0;i<v->faces;i++ )
+      if( v->adj[i] == iAdd ) return;
+   assert( v->faces < MAX_ADJ );
+   v->adj[i] = iAdd;
+   v->faces++;
+}
+
+void initFace( Vert *v, Face *f, int i, int a, int b, int c ){
+   f[i].a = a;
+   f[i].b = b;
+   f[i].c = c;
+   adjAdd( v+a, i );
+   adjAdd( v+b, i );
+   adjAdd( v+c, i );
+}
+
+// sets 'c' as midpoint between a,b
+// height function has what parameters?
+//  -edge length, coordinate, averageTargetHeight
+void midVert( HeightFn fn, Vert *v, int ia, int ib, int ic ){
+   Vert *a = v+ia;
+   Vert *b = v+ib;
+   Vert *c = v+ic;
+
+   c->p[0] = (a->p[0] + b->p[0]) * 0.5f;
+   c->p[1] = (a->p[1] + b->p[1]) * 0.5f;
+   c->p[2] = (a->p[2] + b->p[2]) * 0.5f;
+   float dx = (a->p[0] - b->p[0]);
+   float dz = (a->p[2] - b->p[2]);
+   float edgeLen = sqrtf( dx*dx + dz*dz );
+   float targetHeight = (a->hgt + b->hgt) * 0.5f;
+   c->hgt = (*fn)( c->p, edgeLen, targetHeight );
+   c->vel = 0.f;
+   c->faces = 0;
+}
+
+// Edge is directionless: a->b and b->a define the same edge.
+uint32_t edgeId( uint32_t a, uint32_t b ){
+   if( a < b ) interleaveBits( a, b );
+   else        interleaveBits( b, a );
+}
+
+// given current vertex state, fracture into new vertices with target heights
+// return new count
+// -for every edge (ordered vertex pair), have a mapping to its midpoint vertex
+// -index list is completely recreated on tesselate
+// XXX 'v' must be large enough to contain 4*verts; 'index' must be malloc'd
+int tesselate( HeightFn fn, int verts, Vert *v, int *pfaces, Face **pface ){
+   int faces = *pfaces;
+   Face *face = *pface;
+   printf("tesselate: verts = %d, tris = %d\n", verts, faces );
+
+   // For every triangle, we'll now have four...
+   Face *f = (Face*)calloc( 4 * faces, sizeof(Face) );
+   int newFaces = 0;
+
+   int i;
+
+   // hashtable of vertex indices mapped via edges (vertex pairs)
+   int hashSize = roundPow2( verts*4 );  // should be at least verts*2
+   Hashtable *h = hashCreate( hashSize );
+   int *edgeMap = (int*)malloc( hashSize * sizeof(int) );
+   for( i=0; i<hashSize; i++ ) edgeMap[i] = -1; // -1 is empty
+
+   // face-adjacency is fully updated every time, so clear it now
+   for( i=0; i<verts; i++ ){
+      v[i].faces = 0;
+   }
+
+   for( i=0; i<faces; i++ ){
+      int a = face[i].a;
+      int b = face[i].b;
+      int c = face[i].c;
+
+      // a,b,c are the vertex indices for this triangle... now create or find the
+      // vertices between them, to create 4 new triangles with.
+      uint32_t n;
+      n = hashIndex( h, edgeId(a,b) );
+      if( edgeMap[n] < 0 ){
+         midVert( fn, v, a, b, verts );
+         edgeMap[n] = verts++;
+      }
+      int ab = edgeMap[n];
+
+      n = hashIndex( h, edgeId(b,c) );
+      if( edgeMap[n] < 0 ){
+         midVert( fn, v, b, c, verts );
+         edgeMap[n] = verts++;
+      }
+      int bc = edgeMap[n];
+
+      n = hashIndex( h, edgeId(c,a) );
+      if( edgeMap[n] < 0 ){
+         midVert( fn, v, c, a, verts );
+         edgeMap[n] = verts++;
+      }
+      int ca = edgeMap[n];
+
+      // Four new triangles
+      initFace( v, f, newFaces++, a,  ab, ca );
+      initFace( v, f, newFaces++, b,  bc, ab );
+      initFace( v, f, newFaces++, c,  ca, bc );
+      initFace( v, f, newFaces++, ab, bc, ca );
+   }
+
+   free( edgeMap );
+   free( h );
+
+   free( *pface );
+   *pface = f;
+   *pfaces = newFaces;
+   printf("   output: verts = %d, tris = %d\n", verts, newFaces );
+   return verts;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Terrain Generation
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+// Vertex stuff... TODO: just use gl-matrix.c 
+void vZero( float *a ){
+   a[0] = 0.f; a[1] = 0.f; a[2] = 0.f;
+}
+void vNeg( float *a ){
+   a[0]=-a[0]; a[1]=-a[1]; a[2]=-a[2];
+}
+void vAdd( float *a, float *b ){
+   a[0] += b[0]; a[1] += b[1]; a[2] += b[2];
+}
+void vSub( float *a, float *b ){
+   a[0] -= b[0]; a[1] -= b[1]; a[2] -= b[2];
+}
+void vScale( float *a, float s ){
+   a[0] *= s; a[1] *= s; a[2] *= s;
+}
+float vDot( float *a, float *b ){
+   return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+}
+void vCross( float *a, float *b, float *r ){
+   r[0] = a[1] * b[2] - a[2] * b[1];
+   r[1] = a[2] * b[0] - a[0] * b[2];
+   r[2] = a[0] * b[1] - a[1] * b[0];
+}
+void vNormalize( float *a ){
+   float len = sqrtf( vDot(a,a) );
+   vScale( a, 1.f/len );
+}
+void vCopy( float *s, float *d ){
+   d[0] = s[0]; d[1] = s[1]; d[2] = s[2];
+}
+
+
+// Color functions
+
+void cMix( float t, float *a, float *b, float *r ){
+   int i;
+   for( i=0; i<4; i++ )
+      r[i] = t * (b[i] - a[i]) + a[i];
+}
+
+// mix from -1 (lo) to +1 (hi)
+void cMixSigned( float *rgba, float *lo, float *hi, float mix ){
+   if( mix < 0.f )
+      cMix( -mix, rgba, lo, rgba );
+   else
+      cMix( mix, rgba, hi, rgba );
+}
+
+void cMap( int entries, float map[][5], float t, float *rgba ){
+   int i = 0;
+   while( i < entries && t > map[i][0] ) i++;
+   if( i <= 0 || i >= entries ){
+      if( i >= entries ) i--;
+      memcpy( rgba, &(map[i][1]), 4*sizeof(float) );
+      return;
+   }
+   i--;
+   t = (t - map[i][0]) / (map[i+1][0] - map[i][0]);
+   t = (3.f-t-t) * t * t;  // s-curve
+   float *a = &(map[i][1]);
+   float *b = &(map[i+1][1]);
+   cMix( t, &(map[i][1]), &(map[i+1][1]), rgba );
+}
+
+float terrainColor[][5] = {
+   { 0.00,   0.4, 1.0, 0.2, 1.0 },
+   { 0.20,   0.1, 1.0, 0.2, 1.0 },
+   { 0.40,   0.0, 0.8, 0.0, 1.0 },
+   { 0.47,   0.0, 0.8, 0.0, 1.0 },
+   { 0.50,   0.7, 0.5, 0.2, 1.0 },
+   { 0.55,   0.7, 0.7, 0.6, 1.0 },
+   { 0.85,   0.6, 0.6, 0.6, 1.0 },
+   { 0.90,   1.0, 1.0, 1.0, 1.0 },
+   { 1.00,   1.0, 1.0, 1.0, 1.0 }
+};
+
+float randf( void ){
+   static float rscale = 1.f/(float)RAND_MAX;
+   return (float)(rand())*rscale;
+}
+
+void faceMidpoint( Vert *v, Face *f, float *m ){
+   vZero( m );
+   vAdd( m, v[f->a].p );
+   vAdd( m, v[f->b].p );
+   vAdd( m, v[f->c].p );
+   vScale( m, 0.3333333333f );
+}
+
+// add non-duplicate entry 'n'
+int adjacentAdd( int *a, int count, int vIdx, int n ){
+   if( n != vIdx ){
+      int i = 0; do{
+         if( i == count ){ a[count++] = n; break; }
+      }while( a[i++] != n );
+   }
+   return count;
+}
+
+// fills 'a' with indices of adjacent vertices to vIdx, returning number
+int adjacent( Model *m, int vIdx, int *a ){
+   int i, count=0;
+   Vert *v = &m->v[vIdx];
+   for( i=0; i<v->faces; i++ ){
+      Face *f = &m->f[v->adj[i]];
+      count = adjacentAdd( a, count, vIdx, f->a );
+      count = adjacentAdd( a, count, vIdx, f->b );
+      count = adjacentAdd( a, count, vIdx, f->c );
+   }
+   return count;
+}
+
+float distSqXZ( float *a, float *b ){
+   float dx = b[0] - a[0];
+   float dz = b[2] - a[2];
+   return dx*dx + dz*dz;
+}
+
+// hint is a vertex index to start at; which is also set to closest found vertex
+// NOTE face index can't be used since they can change with tesselation
+float heightAt( Model *m, float x, float z, int *phint ){
+   // Since vertices have no organization, I effectively have to test
+   // each triangle... well, not quite: I can walk in the right direction
+
+   // find support triangle
+   int vi = *phint;
+   Vert *v = m->v;
+
+   // from here I can get all adjacent faces
+   // from faces I can move in direction of x,z which might bound it
+   float p[3] = { x, 0., z };
+
+   float closest = distSqXZ( v[vi].p, p );
+   int adj[16];
+   int i,n,closer;
+   do{
+      closer = 0;
+      n = adjacent( m, vi, adj );
+      for( i=0; i<n; i++ ){
+         int vj = adj[i];
+         float d = distSqXZ( v[vj].p, p );
+         if( d < closest ){
+            vi = vj;
+            closest = d;
+            closer = 1;
+         }
+      }
+   }while( closer );
+   // now vi is index of closest vertex, and closest is distSqXZ of it
+   // also, adj is a valid adjacency list
+
+   // let's just get the next two closest verts and use this as a triangle
+   int a = adj[0]; float da = distSqXZ( v[a].p, p );
+   int b = adj[1]; float db = distSqXZ( v[b].p, p );
+   if( db < da ){ // swap so a is closer than b
+      float t = da; da = db; db = t;
+      a = b; b = adj[0];
+   }
+   for( i=2; i<n; i++ ){
+      int vj = adj[i];
+      float d = distSqXZ( v[vj].p, p );
+      if( d < db ){
+         if( d < da ){
+            b = a; db = da;
+            a = vj; da = d;
+         }else{
+            b = vj; db = d;
+         }
+      }
+   }
+
+   // finally, we have vi, a, b as a triangle -- now determine height
+
+   // even better might be determining a face, because then we have a normal
+   // to use as a plane for intersection
+   float va[3],vb[3],norm[3];
+   vCopy( v[a].p, va );
+   vCopy( v[b].p, vb );
+   vSub( va, v[vi].p );
+   vSub( vb, v[vi].p );
+   vCross( va, vb, norm );
+   vNormalize( norm );
+   float d = vDot( v[vi].p, norm );
+
+   float y = (d - norm[0]*x - norm[2]*z) / norm[1];
+   return y;
+}
+
+void vertColor( Model *m, int idx, float peakHeight, float *rgba ){
+   // use height to lookup color; modify by local curvature
+   Vert *vtx = m->v+idx;
+
+   // calculate vertex normal
+   float n[3] = {0.f, 0.f, 0.f};
+   int i;
+   for( i=0; i<vtx->faces; i++ ){
+      unsigned short j = vtx->adj[i];
+      vAdd( n, m->f[j].n );
+   }
+   vNormalize( n );
+
+   // curvature... face midpoint relative to p; dotprod with n
+   float curvature = 0.f;
+   if( vtx->faces > 0 ){
+      float mid[3];
+      for( i=0; i<vtx->faces; i++ ){
+         unsigned short j = vtx->adj[i];
+         faceMidpoint( m->v, m->f+j, mid );
+         vSub( mid, vtx->p );
+         vNormalize( mid );
+         curvature-= vDot( mid, n );
+      }
+      curvature /= (float)(vtx->faces);
+   }
+   
+   float t = vtx->p[1] / peakHeight;
+   cMap( COUNTED_ARRAY(terrainColor), t, rgba );
+
+   float lo[] = { 0.f, 0.f, 0.f, 1.f };
+   float hi[] = { 1.f, 1.f, 1.f, 1.f };
+   cMixSigned( rgba, lo, hi, curvature<0.?-sqrtf(-curvature):sqrtf(curvature) );
+}
+
+void modelUpdateGL( Model *m, int vStart, int vEnd ){
+   int i;
+   Vert *v = m->v;
+   Face *f = m->f;
+   //printf(" modelUpdateGL lo/hi = %d/%d\n", vStart, vEnd );
+
+   if( vStart <= vEnd ){
+      // XXX forcing all verts to update so colors are updated
+      vStart = 0;
+      vEnd = m->verts - 1;
+
+      // calc face-normals
+      float va[3],vb[3];
+      for( i=0; i<m->faces; i++ ){
+         unsigned short a = f[i].a, b = f[i].b, c = f[i].c;
+         vCopy( v[a].p, va );
+         vCopy( v[b].p, vb );
+         vSub( va, v[c].p );
+         vSub( vb, v[c].p );
+         vCross( va, vb, f[i].n );
+         vNormalize( f[i].n );
+      }
+
+      // vdata in v3c4t2 format
+      float *d;
+      // XXX to get vertColor right, this should be recomputed for every vertex
+      for( i=vStart; i<=vEnd; i++ ){
+         d = m->vdata + 9 * i;
+         *d++ = v[i].p[0];
+         *d++ = v[i].p[1];
+         *d++ = v[i].p[2];
+         vertColor( m, i, 60.f, d ); d+= 4;
+         *d++ = v[i].p[0] * 0.1f;
+         *d++ = v[i].p[2] * 0.1f;
+      }
+
+      // update GPU vertex buffer
+      int stride = m->r.fmt->stride;
+      glBindBuffer( GL_ARRAY_BUFFER, m->r.vbo );
+      glBufferSubData( GL_ARRAY_BUFFER, vStart*stride, (vEnd-vStart+1)*stride, m->vdata + vStart*9 );
+      glBindBuffer( GL_ARRAY_BUFFER, 0 );
+   }
+
+   if( m->updateIndices ){
+      // fill the index array
+      unsigned short *p = m->idata;
+      for( i=0; i<m->faces; i++ ){
+         *p++ = f[i].a; *p++ = f[i].b; *p++ = f[i].c;
+      }
+
+      // update GPU index buffer
+      int indices = m->faces * 3;
+      glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, m->r.ibo );
+      glBufferSubData( GL_ELEMENT_ARRAY_BUFFER, 0, indices*sizeof(GLushort), m->idata );
+      //glBufferData( GL_ELEMENT_ARRAY_BUFFER, indices*sizeof(GLushort), m->idata, GL_STREAM_DRAW );
+      glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+      m->r.count = indices;
+      m->updateIndices = 0;
+   }
+
+	// XXX need to update the VAO for Intel GM45 (?)
+	// FIXME this shouldn't be necessary but helps, so something is fishy
+   /*
+   glBindVertexArray( m->r.vao );
+   glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, m->r.ibo );
+   glBindVertexArray(0);
+   */
+}
+
+void modelTesselate( Model *m, HeightFn fn ){
+   m->verts = tesselate( fn, m->verts, m->v, &m->faces, &m->f );
+   m->updateIndices = 1;
+}
+
+float heightMid( float *p, float edgeLen, float hgt ){
+   return hgt;
+}
+
+float heightPerlin( float *p, float edgeLen, float hgt ){
+   return hgt + 0.4 * edgeLen * perlin( p[0], p[1], p[2]+3.1f );
+}
+
+Model *genTerrain( GLuint prog, VFormat *fmt, int maxTess, float scale ){
+   int verts = 3;
+   int faces = 1;
+
+   // For tesselation level 'n'...
+   //  rows(n) = 2^n+1
+   //  verts(n) = sumToN(rows(n))
+   //  tris(n) = 4^n
+   int maxVerts = sumToN( (1<<maxTess) + 1 );
+   int maxTris = 1 << (maxTess+maxTess);
+
+   int vsize = maxVerts * fmt->stride;
+   int isize = maxTris * 3 * sizeof(GLushort);
+   GLfloat *vdata = (GLfloat*)calloc( vsize, 1 );
+   GLushort *idata = (GLushort*)calloc( isize, 1 );
+   Vert *v = calloc( maxVerts, sizeof(Vert) );
+   Face *f = calloc( 1, sizeof(Face) );
+
+   initVertXZ( v+0,  0.f, -2.f*scale*SQRT3BY3 );
+   initVertXZ( v+1, -scale,    scale*SQRT3BY3 );
+   initVertXZ( v+2,  scale,    scale*SQRT3BY3 );
+
+   f[0].a = 0;
+   f[0].b = 1;
+   f[0].c = 2;
+
+   Model *m = (Model*)malloc( sizeof(Model) );
+   m->v = v;
+   m->f = f;
+   m->vdata = vdata;
+   m->idata = idata;
+   m->verts = verts;
+   m->faces = faces;
+   m->updateIndices = 1;
+
+   Renderable *r = &m->r;
+   r->fmt = fmt;
+   r->prog = prog;
+   r->vbo = newBufObj( GL_ARRAY_BUFFER, vsize, vdata, GL_STREAM_DRAW );
+   r->ibo = newBufObj( GL_ELEMENT_ARRAY_BUFFER, isize, idata, GL_STREAM_DRAW );
+   r->mode = GL_TRIANGLES;
+   r->type = GL_UNSIGNED_SHORT;
+   r->count = faces*3;
+   renderBindVao( r );
+
+   // To set a basic shape (caldera), tesselate twice, and
+   // then seed the vertex array with the shape (heights).
+   modelTesselate( m, heightMid );
+   modelTesselate( m, heightMid );
+
+   // seed some initial heights
+   int i;
+   for( i=0; i<m->verts; i++ ){
+      Vert *v = &m->v[i];
+      float x = v->p[0];
+      float z = v->p[2];
+      float d = sqrtf( x*x + z*z );
+      float h = d < scale*0.3? 0. : 30.f * ( 1.f - cosf( d * 3.f/70.f ) );
+      v->hgt = heightPerlin( v->p, scale*0.5f, h );
+   }
+
+   modelUpdateGL( m, 0, m->verts-1 );
+
+   return m;
+}
+
+void modelUpdate( Model *m, float dt ){
+   // animate vertex height
+   // first: step by a fixed velocity toward hgt, or stop at hgt
+   static float time = 0.f;
+   static int tess = 2;
+   time+= dt;
+   if( tess < 7 && time > 3.f ){
+      modelTesselate( m, heightPerlin );
+      tess++;
+      time = 0.f;
+   }
+
+   // track low and high watermark of changed vertices
+   int lo = m->verts;
+   int hi = 0;
+   int i;
+   for( i=0; i<m->verts; i++ ){
+      Vert *v = &m->v[i];
+      float dy = v->hgt - v->p[1];
+      if( fabs(dy) > 0.01 ){
+         if( i<lo ) lo = i;
+         if( i>hi ) hi = i;
+         dy-= v->vel * dt;
+         float vel = dy * 0.2;
+         v->vel = vel;
+         v->p[1]+= vel * dt;
+      }
+   }
+   modelUpdateGL( m, lo, hi );
 }
 

@@ -1,3 +1,5 @@
+#version 130
+
 /* Basic vertex shader.
  * Transforms point, and interpolates rgba and uv.
  * No lighting!
@@ -6,14 +8,12 @@
 
 uniform mat4 modelViewProjMtx;
 
-// Input
-attribute vec4 point;
-attribute vec4 rgba;
-attribute vec2 uv01;
+in vec4 point;
+in vec4 rgba;
+in vec2 uv01;
 
-// Output
-varying vec4 v_rgba;
-varying vec2 v_uv;
+out vec4 v_rgba;
+out vec2 v_uv;
 
 void main(void){
   v_rgba = rgba;
