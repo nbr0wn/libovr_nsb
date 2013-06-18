@@ -1486,7 +1486,7 @@ int main( int argc, char ** argv )
     int stereo = 0;
 #ifdef STEREO
     stereo = 1;
-    View backbuffer = offscreenBuffer( GL_LINEAR, 1920, 1200 );
+    View backbuffer = offscreenBuffer( GL_LINEAR, 1600, 1000 );
     g_backbuffer = &backbuffer;
     PRINT_GL_ERROR();
 #endif
