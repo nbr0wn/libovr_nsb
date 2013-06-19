@@ -16,7 +16,7 @@ For now, I only have the following packages.  You will still need to install HID
 
 Example source code:
 
-[libovr_nsb-0.3.0-examples.tar.bz2](libovr_nsb-0.3.0-examples.tar.bz2)
+[libovr_nsb-0.3.0-examples.tar.bz2](http://juggerhost.com/libovr_nsb-0.3.0-examples.tar.bz2)
 
 
 Prerequesites
