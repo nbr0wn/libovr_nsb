@@ -21,49 +21,65 @@ Device * openRiftHID( int nthDevice, Device *myDev )
 	wchar_t wstr[MAX_STR];
     Device *dev = myDev;
 	
+    // Iterate over the devices matching our IDs
 	devs = hid_enumerate(0x2833, 0x0001);
 	cur_dev = devs;	
 	while (cur_dev) {
-        if ( !nthDevice )
+        // Skip to the one we want
+        if( nthDevice-- )
         {
-            if (! dev )
-            {
-                dev = (Device *)malloc(sizeof(Device));
-                didAlloc = TRUE;
-            }
-
-            // Open the device
-            dev->hidapi_dev = (hid_device *)hid_open(cur_dev->vendor_id, 
-                    cur_dev->product_id, cur_dev->serial_number);
-
-            dev->vendorId = cur_dev->vendor_id;
-            dev->productId = cur_dev->product_id;
-
-            //printf("\n\nDevice Found:\n");
-
-            // Read the Manufacturer String
-            hid_get_manufacturer_string(dev->hidapi_dev, wstr, MAX_STR);
-            //printf("Manufacturer:  %ls\n", wstr);
-            dev->name = malloc(sizeof(wchar_t) * wcslen(wstr) + 1);
-            wcstombs(dev->name, wstr, wcslen(wstr));
-
-            // Read the Product String
-            hid_get_product_string(dev->hidapi_dev, wstr, MAX_STR);
-            //printf("Product:       %ls\n", wstr);
-            dev->product = malloc(sizeof(wchar_t) * wcslen(wstr) + 1);
-            wcstombs(dev->product, wstr, wcslen(wstr));
-
-            // Read the Serial Number String
-            hid_get_serial_number_string(dev->hidapi_dev, wstr, MAX_STR);
-            //printf("Serial Number: %ls", wstr);
-            dev->serial = malloc(sizeof(wchar_t) * wcslen(wstr) + 1);
-            wcstombs(dev->serial, wstr, wcslen(wstr));
-
-            //printf("\n\n");
-            break;
+            cur_dev = cur_dev->next;
+            continue;
         }
-        nthDevice--;
-		cur_dev = cur_dev->next;
+
+        // Allocate space if we need to
+        if (! dev )
+        {
+            dev = (Device *)malloc(sizeof(Device));
+            didAlloc = TRUE;
+        }
+
+        // Open the device
+        dev->hidapi_dev = (hid_device *)hid_open(cur_dev->vendor_id, 
+                cur_dev->product_id, cur_dev->serial_number);
+
+        // Did we fail to open the device?
+        if( !dev->hidapi_dev )
+        {
+            // Yep. Clean up
+            if( didAlloc )
+            {
+                free(dev);
+            }
+            return 0;
+        }
+
+        // Save the vendor and product IDs (not that we need them)
+        dev->vendorId = cur_dev->vendor_id;
+        dev->productId = cur_dev->product_id;
+
+        //printf("\n\nDevice Found:\n");
+
+        // Read the Manufacturer String
+        hid_get_manufacturer_string(dev->hidapi_dev, wstr, MAX_STR);
+        //printf("Manufacturer:  %ls\n", wstr);
+        dev->name = malloc(sizeof(wchar_t) * wcslen(wstr) + 1);
+        wcstombs(dev->name, wstr, wcslen(wstr));
+
+        // Read the Product String
+        hid_get_product_string(dev->hidapi_dev, wstr, MAX_STR);
+        //printf("Product:       %ls\n", wstr);
+        dev->product = malloc(sizeof(wchar_t) * wcslen(wstr) + 1);
+        wcstombs(dev->product, wstr, wcslen(wstr));
+
+        // Read the Serial Number String
+        hid_get_serial_number_string(dev->hidapi_dev, wstr, MAX_STR);
+        //printf("Serial Number: %ls", wstr);
+        dev->serial = malloc(sizeof(wchar_t) * wcslen(wstr) + 1);
+        wcstombs(dev->serial, wstr, wcslen(wstr));
+
+        //printf("\n\n");
+        break;
 	}
 	hid_free_enumeration(devs);
 
