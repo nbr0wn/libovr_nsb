@@ -1,0 +1,13 @@
+
+all: gldemo consoletest hmd_orientation
+
+LDLIBS=-lovr_nsb -lgl_matrix -lGL -lGLU -lglut -lpthread -lm 
+
+gldemo: gldemo.o
+
+consoletest: consoletest.o
+
+hmd_orientation: hmd_orientation.o
+
+clean:
+	rm -f *.o gldemo consoletest hmd_orientation

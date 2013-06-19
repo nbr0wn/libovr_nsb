@@ -14,6 +14,11 @@ For now, I only have the following packages.  You will still need to install HID
 + [Ubuntu 13.04 32bit deb](http://juggerhost.com/ubuntu_13/libovrnsb_0.3.0_i686.deb)
 + [Ubuntu 12.04LTS 64bit deb](http://juggerhost.com/ubuntu_12/libovrnsb_0.3.0_amd64.deb)
 
+Example source code:
+
+[libovr_nsb-0.3.0-exampples.tar.bz2](libovr_nsb-0.3.0-exampples.tar.bz2)
+
+
 Prerequesites
 --------------
 + GLUT (for the examples) - freeglut3 on ubuntu
@@ -106,5 +111,6 @@ you can pm to 'nsb' there.  Otherwise, feel free to email me: nbrown1@gmail.com
 
 Contributors
 ------------
-To Be Announced if they want to be called out
+Anthony Tavener
+..and many others!
 
