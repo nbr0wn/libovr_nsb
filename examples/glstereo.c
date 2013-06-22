@@ -1,8 +1,21 @@
+/* libovr-nsb/glstereo
+ *
+ * Author: Anthony Tavener
+ *
+ * Simplified stereo-rendering interface for the Rift.
+ *
+ * This file falls under the Oculus license as code within
+ * is derived from parts of the OculusVR SDK.
+ *
+ */
+
 #include "glstereo.h"
 
 /* TODO
  *
- *  -render pos/orient, and what assumptions do we make about eye/head/neck?
+ *  -render pos and orient should be controllable
+ *    -what assumptions do we make about eye/head/neck?
+ *    -currently a simple head/neck model positions two eyes
  *  -general cleanup and API improvement
  *
  */
@@ -257,7 +270,6 @@ static void mapDistortion( GLStereo *sr, GLuint src, Distortion *d, View *v, Vie
 
     glUseProgram( distortShader );
 
-    // FIXME g_width g_height are really HMD params
     float w = (float)(v->wid) / (float)(target->wid);
     float h = (float)(v->hgt) / (float)(target->hgt);
     float x = (float)(v->x0) / (float)(target->wid);
@@ -353,7 +365,7 @@ static void clearDistortProgram( GLStereo *sr ){
 }
 
 
-void glStereoSetDistort( GLStereo *sr, enum DistortKind distort )
+void glStereoSetDistort( GLStereo *sr, DistortKind distort )
 {
     if( !sr->shader || sr->distort != distort )
     {
@@ -400,9 +412,10 @@ static GLStereo *create( Device *dev, int rendw, int rendh )
     Distortion *distort = &g_defaultDistort; // FIXME
 
     sr->dev = dev;
-    sr->framebuffer = frameBuffer( displayInfo->HResolution, displayInfo->VResolution );
-    sr->backbuffer = offscreenBuffer( GL_LINEAR, rendw, rendh );
     sr->shader = 0;
+
+    viewSetFrameBuffer( &sr->framebuffer, displayInfo->HResolution, displayInfo->VResolution );
+    viewSetOffscreenBuffer( &sr->backbuffer, GL_LINEAR, rendw, rendh );
 
     // distortionFitXY... coordinates of a point to 'fit' to the distorted
     // display -- so, -1,0 meaning to keep the leftmost point in-view
@@ -416,7 +429,7 @@ static GLStereo *create( Device *dev, int rendw, int rendh )
     return sr;
 }
 
-GLStereo *glStereoCreate( Device *dev, int rendw, int rendh, enum DistortKind distort )
+GLStereo *glStereoCreate( Device *dev, int rendw, int rendh, DistortKind distort )
 {
     GLStereo *sr = create( dev, rendw, rendh );
     glStereoSetDistort( sr, distort );
@@ -436,6 +449,12 @@ void glStereoRender( GLStereo *sr, double pos[3], render_fn render )
     View *bb = &sr->backbuffer;
     View *fb = &sr->framebuffer;
 
+    if( !bb->offscreen || !fboBind(bb->fbo) )
+    {
+        error();
+        return;
+    }
+
     // Orientation, from HMD sensor
     double orient[4] = { 0., 0., 0., 1. };
     if( sr->dev )
@@ -444,85 +463,94 @@ void glStereoRender( GLStereo *sr, double pos[3], render_fn render )
         quat_multiply( orient, g_qref, NULL ); // apply inverse-reference orientation
     }
 
-    if( bb->offscreen && fboBind(bb->fbo) )
+    /* Offscreen stereo render with distortion */
+
+    // clear the color and depth buffers
+    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+
+    double proj[16];
+
+    double ipd = 0.064; // inter-pupillary distance
+    double leftEye[3] = { -0.5*ipd, 0.15, 0.1 };
+    double rightEye[3] = { 0.5*ipd, 0.15, 0.1 };
+
+    double offs = stereoProjectionOffset( getDisplayInfo(sr->dev) );
+    int halfwid = bb->wid >> 1;
+
+
+    /*** Left Eye ***/
+
+    glViewport( 0.0f, 0.0f, halfwid, bb->hgt );
+
+    // offset projection matrix for left lens
+    mat4_identity( proj ); proj[12] = offs;
+    mat4_multiply( proj, sr->proj, NULL );
+
+    // build view matrix for left eye
+    quat_multiplyVec3( orient, leftEye, NULL );
+    vec3_add( leftEye, pos, NULL );
+    viewOfPosOrient( leftEye, orient, eye );
+
+    render( eye, proj, NULL );
+
+
+    /*** Right Eye ***/
+
+    glViewport( halfwid, 0.0f, halfwid, bb->hgt );
+
+    // offset projection matrix for right lens
+    mat4_identity( proj ); proj[12] = -offs;
+    mat4_multiply( proj, sr->proj, NULL );
+
+    // build view matrix for right eye
+    quat_multiplyVec3( orient, rightEye, NULL );
+    vec3_add( rightEye, pos, NULL );
+    viewOfPosOrient( rightEye, orient, eye );
+
+    render( eye, proj, NULL );
+
+    fboUnbind(); // return to framebuffer
+
+
+    /* distort from backbuffer to framebuffer */
+
+    View v; memset( &v, 0, sizeof(View) );
+    Distortion distort = g_defaultDistort;
+
+    v.wid = fb->wid/2.; v.hgt = fb->hgt;
+    mapDistortion( sr, bb->rgba, &distort, &v, fb );
+
+    v.x0 = v.wid;
+    distort.XCenterOffset = -distort.XCenterOffset;
+    mapDistortion( sr, bb->rgba, &distort, &v, fb );
+
+}
+
+void glStereoRenderMono( GLStereo *sr, double pos[3], render_fn render )
+{
+    double eye[16];
+    View *fb = &sr->framebuffer;
+
+    // Orientation, from HMD sensor
+    double orient[4] = { 0., 0., 0., 1. };
+    if( sr->dev )
     {
-        /* Offscreen stereo render with distortion */
-
-        // clear the color and depth buffers
-        glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-
-        double proj[16];
-
-        double ipd = 0.064; // inter-pupillary distance
-        double leftEye[3] = { -0.5*ipd, 0.15, 0.1 };
-        double rightEye[3] = { 0.5*ipd, 0.15, 0.1 };
-
-        double offs = stereoProjectionOffset( getDisplayInfo(sr->dev) );
-        int halfwid = bb->wid >> 1;
-
-
-        /*** Left Eye ***/
-
-        glViewport( 0.0f, 0.0f, halfwid, bb->hgt );
-
-        // offset projection matrix for left lens
-        mat4_identity( proj ); proj[12] = offs;
-        mat4_multiply( proj, sr->proj, NULL );
-
-        // build view matrix for left eye
-        quat_multiplyVec3( orient, leftEye, NULL );
-        vec3_add( leftEye, pos, NULL );
-        viewOfPosOrient( leftEye, orient, eye );
-
-        render( eye, proj, NULL );
-
-
-        /*** Right Eye ***/
-
-        glViewport( halfwid, 0.0f, halfwid, bb->hgt );
-
-        // offset projection matrix for right lens
-        mat4_identity( proj ); proj[12] = -offs;
-        mat4_multiply( proj, sr->proj, NULL );
-
-        // build view matrix for right eye
-        quat_multiplyVec3( orient, rightEye, NULL );
-        vec3_add( rightEye, pos, NULL );
-        viewOfPosOrient( rightEye, orient, eye );
-
-        render( eye, proj, NULL );
-
-        fboUnbind(); // return to framebuffer
-
-
-        /* distort from backbuffer to framebuffer */
-
-        View v; memset( &v, 0, sizeof(View) );
-        Distortion distort = g_defaultDistort;
-
-        v.wid = fb->wid/2.; v.hgt = fb->hgt;
-        mapDistortion( sr, bb->rgba, &distort, &v, fb );
-
-        v.x0 = v.wid;
-        distort.XCenterOffset = -distort.XCenterOffset;
-        mapDistortion( sr, bb->rgba, &distort, &v, fb );
+        quat_set( sr->dev->Q, orient );
+        quat_multiply( orient, g_qref, NULL ); // apply inverse-reference orientation
     }
-    else
-    {
-        /* Direct framebuffer render with no stereo or distortion */
-        glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
-        glViewport( 0.0f, 0.0f, fb->wid, fb->hgt );
-        viewOfPosOrient( pos, orient, eye );
-        render( eye, sr->proj, NULL );
+    /* Direct framebuffer render with no stereo or distortion */
+    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
-    }
+    glViewport( 0.0f, 0.0f, fb->wid, fb->hgt );
+    viewOfPosOrient( pos, orient, eye );
+    render( eye, sr->proj, NULL );
 }
 
 void glStereoDestroy( GLStereo *sr )
 {
-    freeOffscreenBuffer( &sr->framebuffer );
-    freeOffscreenBuffer( &sr->backbuffer );
+    viewFreeOffscreenBuffer( &sr->framebuffer );
+    viewFreeOffscreenBuffer( &sr->backbuffer );
     clearDistortProgram( sr );
     free( sr );
 }

@@ -1,3 +1,13 @@
+/* libovr-nsb/gltools
+ *
+ * Author: Anthony Tavener
+ *
+ * Various OpenGL tools for simplifying common usage...
+ * Loading shaders, creating buffers, defining vertex formats.
+ *
+ */
+
+
 #include <stdio.h>
 #include "gltools.h"
 
@@ -301,20 +311,31 @@ GLuint fboCreateWithDepth( GLuint texture, GLuint depth )
 // View (viewport) and offscreen buffer
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-View frameBuffer( GLsizei w, GLsizei h )
+void viewSetFrameBuffer( View *v, GLsizei w, GLsizei h )
 {
-    return (View){ 0, 0, w, h, 0, 0, 0, 0 };
+    v->x0  = 0;
+    v->y0  = 0;
+    v->wid = w;
+    v->hgt = h;
+    v->offscreen = 0;
+    v->rgba  = 0;
+    v->depth = 0;
+    v->fbo   = 0;
 }
 
-View offscreenBuffer( GLint filter, GLsizei w, GLsizei h )
+void viewSetOffscreenBuffer( View *v, GLint filter, GLsizei w, GLsizei h )
 {
-    GLuint rgba = texCreateTarget( TEX_BYTE4, w, h, filter, TEX_CLAMP );
-    GLuint depth = renderbufferNew( GL_DEPTH_COMPONENT, w, h );
-    GLuint fbo = fboCreateWithDepth( rgba, depth );
-    return (View){ 0, 0, w, h, 1, rgba, depth, fbo };
+    v->x0  = 0;
+    v->y0  = 0;
+    v->wid = w;
+    v->hgt = h;
+    v->offscreen = 1;
+    v->rgba  = texCreateTarget( TEX_BYTE4, w, h, filter, TEX_CLAMP );
+    v->depth = renderbufferNew( GL_DEPTH_COMPONENT, w, h );
+    v->fbo   = fboCreateWithDepth( v->rgba, v->depth );
 }
 
-void freeOffscreenBuffer( View *v )
+void viewFreeOffscreenBuffer( View *v )
 {
     glDeleteTextures( 1, &v->rgba );
     glDeleteRenderbuffers( 1, &v->depth );

@@ -79,8 +79,8 @@ typedef struct {
 } VFormat;
 
 VFormat vtxNewFormat( GLuint prog, int count, VDesc desc[] );
-void vtxEnable( VFormat *fmt );
-void vtxDisable( VFormat *fmt );
+void    vtxEnable( VFormat *fmt );
+void    vtxDisable( VFormat *fmt );
 
 
 
@@ -124,9 +124,9 @@ typedef struct {
     GLuint fbo;
 } View;
 
-View frameBuffer( GLsizei w, GLsizei h );
-View offscreenBuffer( GLint filter, GLsizei w, GLsizei h );
-void freeOffscreenBuffer( View *v );
+void viewSetFrameBuffer( View *v, GLsizei w, GLsizei h );
+void viewSetOffscreenBuffer( View *v, GLint filter, GLsizei w, GLsizei h );
+void viewFreeOffscreenBuffer( View *v );
 
 
 

@@ -1,4 +1,4 @@
-/* libnsb-ovr/gldemo
+/* libovr-nsb/gldemo
  *
  * Author: Anthony Tavener
  *
@@ -17,14 +17,13 @@
 #include "gltools.h"
 #include "glstereo.h"
 
-
 // TODO
 //  -improve user movement (rotate view with body? mouse-based?)
-//  -skydome?
 //  -lighting?
-//  -remove g_width,g_height... and other inappropriate global state
 //
-//  -warped stereo disable -- commandline option (also implies windowed)
+//  -aspect (projection) is all wrong with stereo disabled -- need a
+//   different proj matrix
+//
 //  -set Distortion struct from HMD info
 //  -rather than GetAttribLocation, use BindAttribLocation (do before linking)
 //  -properly clean-up resources (buffers, textures, mallocs), and exit
@@ -53,6 +52,48 @@ void oglMatrix( mat4_t m, float *f )
     int i;
     for( i=0;i<16;i++ ) f[i] = m[i];
 }
+
+// Elapsed time since glutInit(), in seconds
+float simtime()
+{
+    return (float)( glutGet( GLUT_ELAPSED_TIME ) ) / 1000.0f;
+}
+
+// Fullscreen shader uses builtin vertex shader with specified fragment shader.
+//
+// I prefer PROCEDURAL_FULLSCREEN for simplicity and elegance, but I'm not
+// sure if it's widely supported in practice (OpenGL3.3).
+#define PROCEDURAL_FULLSCREEN
+#ifdef PROCEDURAL_FULLSCREEN
+char screenVertShader[] = "\
+#version 330 core\n\
+uniform mat4 toWorld;\
+out vec3 ray;\
+void main(void){\
+    vec2 p = vec2( (gl_VertexID << 1) & 2, gl_VertexID & 2 ) - vec2(1.0);\
+    ray = (toWorld * vec4( p, 1.0, 1.0 )).xyz;\
+    gl_Position = vec4( p, 0.0, 1.0 );\
+}";
+#else
+char screenVertShader[] = "\
+#version 130\n\
+uniform mat4 toWorld;\
+in vec4 point;\
+out vec3 ray;\
+void main(void){\
+    ray = (toWorld * vec4( p.xy, 1.0, 1.0 )).xyz;\
+    gl_Position = point;\
+}";
+#endif
+
+GLuint fullscreenShader( char *fname ){
+    ShaderSource toLoad = { GL_FRAGMENT_SHADER, fname };
+    GLuint shader[2];
+    shader[0] = shaderCompile( GL_VERTEX_SHADER, "<builtin>screenVertShader", screenVertShader );
+    shader[1] = shaderLoadAndCompile( &toLoad );
+    return shaderLink( 2, shader );
+}
+
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -192,6 +233,10 @@ GLStereo *g_stereo = NULL;
 RList *g_renderList = NULL;
 
 Model *g_terrain = NULL;
+
+GLuint g_skyshader = 0;
+
+int g_inStereo = 0;
 
 
 // Shaders
@@ -361,11 +406,64 @@ void move( double pos[3] )
 // Rendering
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-// level of abstraction...
-//  library providing support functions for any use...
-//  with a higher level "do basic stereo render" on top
-//  -embed basic (OVR) shaders in code for this high-level
-//
+// Sky render
+//  -this is handled as a full-screen "raytrace" style shader
+//  -'mtx' is the inverse view-proj matrix, to bring the frustum corners into
+//    world-space; interpolated between verts, this provides a ray per pixel
+static void skyRender( float *mtx, float time, GLuint shader )
+{
+    static GLuint vao = 0;
+
+#ifdef PROCEDURAL_FULLSCREEN
+    if( !vao ) glGenVertexArrays( 1, &vao );
+#else
+    static GLuint vbo = 0;
+    static VDesc desc[] = { {"point", 3} };
+    static VFormat v3; // vertex format only used for screen-quad
+    static float screenVerts[] =
+    { -1.0, -1.0,  0.0,
+       1.0, -1.0,  0.0,
+      -1.0,  1.0,  0.0,
+       1.0,  1.0,  0.0 };
+
+    if( !vbo )
+    {
+        v3 = vtxNewFormat( shader, COUNTED_ARRAY(desc) );
+        vbo = newBufObj( GL_ARRAY_BUFFER, BYTE_ARRAY(screenVerts), GL_STATIC_DRAW );
+        glBindBuffer( GL_ARRAY_BUFFER, vbo );
+        glGenVertexArrays( 1, &vao );
+        glBindVertexArray( vao );
+        vtxEnable( &v3 );
+        glBindVertexArray( 0 );
+        vtxDisable( &v3 );
+        glBindBuffer( GL_ARRAY_BUFFER, 0 );
+    }
+#endif
+
+    GLint u_toWorld = glGetUniformLocation( shader, "toWorld" );
+    GLint u_time = glGetUniformLocation( shader, "time" );
+
+    glUseProgram( shader );
+
+    glUniformMatrix4fv( u_toWorld, 1, GL_FALSE, mtx );
+    glUniform1fv( u_time, 1, &time );
+
+
+    // Render 
+
+    glDisable( GL_BLEND );
+    glDepthMask( GL_FALSE );
+
+    glBindVertexArray( vao );
+    glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+    glBindVertexArray( 0 );
+
+    glDepthMask( GL_TRUE );
+    glEnable( GL_BLEND );
+    glUseProgram( 0 );
+}
+
+
 void render( mat4_t view, mat4_t proj, void *data )
 {
     RList *r = g_renderList;
@@ -375,6 +473,13 @@ void render( mat4_t view, mat4_t proj, void *data )
     GLint u_mv;
     GLuint prog = 0;
 
+    // Skysphere
+    mat4_multiply( proj, view, dMtx );
+    mat4_inverse( dMtx, NULL );
+    oglMatrix( dMtx, fMtx );
+    skyRender( fMtx, simtime(), g_skyshader );
+
+    // Scene
     while( r )
     {
         if( r->rend->prog != prog )
@@ -406,24 +511,29 @@ void render( mat4_t view, mat4_t proj, void *data )
 void updateFunc( )
 {
     static double headpos[3] = { 0., 0., 0. }; // world-pos of base of head
-    double dt = 1./60.;
+    static float tprev = 0.f;
 
+    float t = simtime();
+    float dt = t - tprev;
+    if( dt > 0.05 ) dt = 0.05;
+    tprev = t;
+    
     modelUpdate( g_terrain, dt );
     move( headpos );
 
-    glStereoRender( g_stereo, headpos, render );
+    if( g_inStereo )
+        glStereoRender( g_stereo, headpos, render );
+    else
+        glStereoRenderMono( g_stereo, headpos, render );
 
     glFlush();
     glutSwapBuffers();
+    glutPostRedisplay();
 }
 
 
-/////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////
 void idleFunc( )
 {
-    // render the scene
-    glutPostRedisplay( );
 }
 
 
@@ -461,6 +571,9 @@ void *threadFunc( void *data )
     printf("\ts,d - turning left or right\n");
     printf("\t--yes, movement is hacky and completely decoupled from view right now\n\n");
 
+    if( !g_inStereo )
+        printf("\tTip: use command-line option --rift for use with the Rift!\n\n");
+
     while( localDev->runSampleThread )
     {
         // Try to sample the device for 1ms
@@ -481,6 +594,7 @@ void runSensorUpdateThread( Device *dev )
     dev->runSampleThread = TRUE;
     pthread_create(&f1_thread,NULL,threadFunc,dev);
 }
+
 
 
 // Procedural texture...
@@ -505,6 +619,17 @@ void fn1( double x, double y, double z, unsigned char *d )
     d[3] = 255;
 }
 
+void usage( char *progname ){
+    printf("\n");
+    printf("%s [options]\n", progname );
+    printf("Options:\n");
+    printf(" --res <w>x<h>     -\n");
+    printf(" --fullscreen      -start in fullscreen mode (TAB still toggles)\n");
+    printf(" --stereo          -stereo split, with barrel distortion\n");
+    printf(" --rift            -same as fullscreen and stereo, res based on hardware\n");
+    printf(" --sky <file.glsl> -specify fragment shader to use for sky\n");
+    printf("\n");
+}
 
 //-----------------------------------------------------------------------------
 // Name: main( )
@@ -512,6 +637,39 @@ void fn1( double x, double y, double z, unsigned char *d )
 //-----------------------------------------------------------------------------
 int main( int argc, char ** argv )
 {
+    char skyfile[256] = "sky.frag";
+    int fullscreen = 0;
+
+    char *progname = argv[0];
+    while( argc > 1 )
+    {
+        if( !strncmp( argv[1],"--res",5 ) ){
+            sscanf( argv[2],"%dx%d", &g_width, &g_height );
+            argv++; argc--;
+        }else
+        if( !strncmp( argv[1],"--fullscreen",12 ) ){
+            fullscreen = 1;
+        }else
+        if( !strncmp( argv[1],"--stereo",8 ) ){
+            g_inStereo = 1;
+        }else
+        if( !strncmp( argv[1],"--rift",6 ) ){
+            fullscreen = 1;
+            g_inStereo = 1;
+        }else
+        if( !strncmp( argv[1],"--sky",5 ) ){
+            sscanf( argv[2],"%255s", skyfile );
+            argv++; argc--;
+        }else{
+            if( strncmp( argv[1],"--help",6 ) )
+                printf( "Unrecognized option: %s\n", argv[1] );
+            usage( progname );
+            exit(1);
+        }
+        argv++; argc--;
+    }
+
+
     dev = (Device *)malloc(sizeof(Device));
     runSensorUpdateThread(dev);
 
@@ -522,7 +680,9 @@ int main( int argc, char ** argv )
     glutInitWindowSize( g_width, g_height );
     glutInitWindowPosition( 0, 0 );
     glutCreateWindow( argv[0] );
-    toggleFullScreen();
+
+    if( fullscreen )
+        toggleFullScreen();
 
     // Set up our callbacks
     glutIdleFunc( idleFunc );
@@ -538,6 +698,7 @@ int main( int argc, char ** argv )
 
     PRINT_GL_ERROR();
 
+    g_skyshader = fullscreenShader( skyfile );
 
     /* XXX The following are "local variables" which must persist...
      * these functions can be made to allocate from the heap instead, with
@@ -572,6 +733,9 @@ int main( int argc, char ** argv )
     r0.next = NULL;
     g_renderList = &r0;
 
+    // FIXME is there a nice way to support non-stereo (and do we want to)
+    // with "glStereo"? Or should it be purely the stereo abstraction? If so,
+    // should the rift orientation/headmodel be extracted?
     g_stereo = glStereoCreate( dev, 1600, 1000, DISTORT_RADIAL );
 
     // Go Glut
@@ -1250,7 +1414,7 @@ Model *genTerrain( GLuint prog, VFormat *fmt, int maxTess, double scale )
         double x = v->p[0];
         double z = v->p[2];
         double d = sqrt( x*x + z*z );
-        double h = d < scale*0.3? 0. : 30.f * ( 1.f - cosf( d * 3.f/70.f ) );
+        double h = d < scale*0.3? 0. : 25.f * ( 1.f - cosf( d * 3.f/70.f ) );
         v->hgt = heightPerlin( v->p, scale*0.5f, h );
     }
 
